@@ -2,7 +2,7 @@
 Repositorio para operaciones CRUD en Elasticsearch.
 """
 
-from typing import Any, Generic, Optional, TypeVar, list
+from typing import Any, Generic, Optional, TypeVar
 from datetime import datetime
 from loguru import logger
 

@@ -50,7 +50,7 @@ class Config:
         self.file_config = {}
 
         if config_path.exists():
-            with open(config_path, "r") as f:
+            with open(config_path, "r", encoding="utf-8") as f:
                 self.file_config = yaml.safe_load(f) or {}
 
     def get(self, key: str, default: Any = None) -> Any:
