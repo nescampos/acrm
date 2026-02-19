@@ -1,6 +1,24 @@
-# Configuración del sistema CRM Multi-Agente
+# Configuración del sistema CRM Multi-Agente con Elastic
 
-# Configuración LLM
+# Configuración Elastic Stack
+elastic:
+  host: http://localhost:9200
+  user: elastic
+  password: changeme
+  verify_certs: false
+  timeout: 30
+  # Cloud alternative:
+  # cloud_id: your_cloud_id
+  # cloud_api_key: your_api_key
+
+  # Índices CRM
+  indices:
+    customers: crm_customers
+    tickets: crm_tickets
+    interactions: crm_interactions
+    campaigns: crm_campaigns
+
+# Configuración LLM para Elastic Agent Builder
 llm:
   provider: openai
   model: gpt-4o
@@ -9,20 +27,30 @@ llm:
 
 # Configuración de agentes
 agents:
+  # Agente de Ventas con Elastic
   sales:
     enabled: true
+    type: elastic  # elastic o standard
     auto_qualify_leads: true
     follow_up_interval_hours: 24
-  
+    semantic_search: true
+    rag_enabled: true
+
+  # Agente de Soporte con Elastic
   support:
     enabled: true
+    type: elastic
     auto_classify_tickets: true
     escalation_threshold_minutes: 30
-  
+    search_history: true
+
+  # Agente de Marketing con Elastic
   marketing:
     enabled: true
+    type: elastic
     auto_segment: true
     campaign_frequency: weekly
+    engagement_analysis: true
 
 # Configuración de logging
 logging:
@@ -31,12 +59,6 @@ logging:
   file: logs/app.log
   rotation: 10 MB
   retention: 30 days
-
-# Configuración de base de datos (opcional)
-database:
-  enabled: false
-  type: sqlite
-  path: data/crm.db
 
 # Configuración de API (si se expone REST)
 api:

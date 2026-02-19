@@ -1,7 +1,8 @@
 """
-Main - Punto de entrada de la aplicación.
+Main - Punto de entrada de la aplicación CRM con Elastic.
 
-Ejemplo de uso del sistema multi-agente CRM.
+Ejemplo de uso del sistema multi-agente integrado con Elasticsearch
+y Elastic Agent Builder.
 """
 
 import asyncio
@@ -11,129 +12,219 @@ from typing import Optional
 from loguru import logger
 
 from orchestrator import CRMOrchestrator
-from agents.specialized import SalesAgent, SupportAgent, MarketingAgent
+from elastic import (
+    elastic_client,
+    CustomerRepository,
+    TicketRepository,
+    InteractionRepository,
+    CampaignRepository,
+    create_elastic_sales_agent,
+    create_elastic_support_agent,
+    create_elastic_marketing_agent,
+    Customer,
+    Ticket,
+    Interaction,
+)
 from utils.logger import setup_logger
 from config import config
 
 
-class CRMApplication:
+class ElasticCRMApplication:
     """
-    Aplicación principal del CRM Multi-Agente.
+    Aplicación CRM Multi-Agente con integración Elastic.
     """
 
     def __init__(self):
         self.orchestrator: Optional[CRMOrchestrator] = None
         self._shutdown_event = asyncio.Event()
+        
+        # Repositorios Elastic
+        self.customer_repo: Optional[CustomerRepository] = None
+        self.ticket_repo: Optional[TicketRepository] = None
+        self.interaction_repo: Optional[InteractionRepository] = None
+        self.campaign_repo: Optional[CampaignRepository] = None
 
     async def initialize(self) -> None:
-        """Inicializa la aplicación y registra todos los agentes."""
+        """Inicializa la aplicación, Elastic y registra agentes."""
         setup_logger(level=config.log_level)
-        logger.info("Iniciando CRM Multi-Agente...")
+        logger.info("Iniciando Elastic CRM Multi-Agente...")
+
+        # Verificar conexión con Elastic
+        connected = await elastic_client.ping()
+        if not connected:
+            logger.warning("No se pudo conectar a Elasticsearch. Continuando en modo limitado.")
+        else:
+            logger.info("Conectado a Elasticsearch")
+
+        # Inicializar repositorios
+        self.customer_repo = CustomerRepository()
+        self.ticket_repo = TicketRepository()
+        self.interaction_repo = InteractionRepository()
+        self.campaign_repo = CampaignRepository()
+
+        # Crear índices en Elastic
+        await self._initialize_indices()
 
         # Crear orquestador
         self.orchestrator = CRMOrchestrator()
 
-        # Crear y registrar agentes
+        # Crear y registrar agentes Elastic
         agents = [
-            SalesAgent(config={"auto_qualify": True}),
-            SupportAgent(config={"auto_classify": True}),
-            MarketingAgent(config={"auto_segment": True}),
+            create_elastic_sales_agent(),
+            create_elastic_support_agent(),
+            create_elastic_marketing_agent(),
         ]
 
         for agent in agents:
             await self.orchestrator.register_agent(agent)
-            logger.info(f"Agente registrado: {agent.name}")
+            logger.info(f"Agente Elastic registrado: {agent.name}")
 
-        logger.info("CRM Multi-Agente inicializado correctamente")
+        logger.info("Elastic CRM Multi-Agente inicializado correctamente")
+
+    async def _initialize_indices(self) -> None:
+        """Inicializa índices de Elasticsearch."""
+        try:
+            await self.customer_repo.initialize()
+            await self.ticket_repo.initialize()
+            await self.interaction_repo.initialize()
+            await self.campaign_repo.initialize()
+            logger.info("Índices de Elastic inicializados")
+        except Exception as e:
+            logger.warning(f"Error inicializando índices: {e}")
 
     async def run_demo(self) -> None:
         """Ejecuta una demostración de las capacidades del sistema."""
-        logger.info("=== Iniciando Demostración ===")
+        logger.info("=== Iniciando Demostración Elastic CRM ===")
 
-        # 1. Agregar clientes de ejemplo
-        logger.info("1. Agregando clientes al CRM...")
-        customers = [
-            {
-                "name": "Juan Pérez",
-                "email": "juan@example.com",
-                "phone": "+1234567890",
-                "status": "lead",
-            },
-            {
-                "name": "María García",
-                "email": "maria@example.com",
-                "phone": "+0987654321",
-                "status": "prospect",
-            },
-            {
-                "name": "Carlos López",
-                "email": "carlos@example.com",
-                "phone": "+1122334455",
-                "status": "customer",
-            },
+        # 1. Agregar clientes a Elasticsearch
+        logger.info("1. Agregando clientes a Elasticsearch...")
+        customers_data = [
+            Customer(
+                name="Juan Pérez",
+                email="juan@example.com",
+                phone="+1234567890",
+                company="TechCorp",
+                status="lead",
+                lead_score=75,
+                tags=["enterprise", "hot_lead"],
+            ),
+            Customer(
+                name="María García",
+                email="maria@example.com",
+                phone="+0987654321",
+                company="DataSoft",
+                status="prospect",
+                lead_score=60,
+                engagement_score=45,
+                tags=["smb", "warm"],
+            ),
+            Customer(
+                name="Carlos López",
+                email="carlos@example.com",
+                phone="+1122334455",
+                company="CloudInc",
+                status="customer",
+                lifetime_value=15000.0,
+                engagement_score=85,
+                tags=["enterprise", "champion"],
+            ),
         ]
 
-        for cust_data in customers:
-            customer = self.orchestrator.add_customer(cust_data)
-            logger.info(f"Cliente agregado: {customer.name} (ID: {customer.customer_id[:8]}...)")
+        for customer in customers_data:
+            await self.customer_repo.create(customer)
+            logger.info(f"Cliente agregado a Elastic: {customer.name}")
 
-        # 2. Agente de Ventas - Calificar lead
-        logger.info("\n2. Agente de Ventas - Calificando lead...")
-        sales_agent = self.orchestrator.get_agent("sales_agent")
-        if sales_agent:
+        # Esperar a que Elastic indexe
+        await asyncio.sleep(1)
+
+        # 2. Búsqueda en Elasticsearch
+        logger.info("\n2. Búsqueda en Elasticsearch...")
+        results = await self.customer_repo.search({"match_all": {}})
+        logger.info(f"Clientes en Elastic: {len(results)}")
+
+        # Búsqueda específica
+        juan_results = await self.customer_repo.find_by_email("juan@example.com")
+        if juan_results:
+            logger.info(f"Encontrado: {juan_results.name} (Lead Score: {juan_results.lead_score})")
+
+        # 3. Agente Elastic - Analizar cliente con contexto de Elastic
+        logger.info("\n3. Agente Elastic - Analizando cliente con RAG...")
+        sales_agent = self.orchestrator.get_agent("elastic_sales_agent")
+        if sales_agent and juan_results:
             result = await sales_agent.execute({
-                "action": "qualify_lead",
-                "customer_id": customers[0]["email"],
-                "data": {
-                    "budget": 5000,
-                    "has_authority": True,
-                    "need_score": 80,
-                    "timeline": "this_month",
-                },
+                "action": "analyze",
+                "customer_id": juan_results.customer_id,
+                "include_interactions": False,
+                "include_tickets": False,
             })
-            logger.info(f"Calificación: {result.data}")
+            logger.info(f"Análisis completado: {result.data}")
 
-        # 3. Agente de Soporte - Crear ticket
-        logger.info("\n3. Agente de Soporte - Creando ticket...")
-        support_agent = self.orchestrator.get_agent("support_agent")
+        # 4. Crear ticket en Elasticsearch
+        logger.info("\n4. Creando ticket en Elasticsearch...")
+        ticket = Ticket(
+            customer_id=juan_results.customer_id if juan_results else "unknown",
+            subject="Consulta sobre pricing enterprise",
+            description="El cliente necesita información sobre planes enterprise",
+            status="open",
+            priority="medium",
+            category="sales",
+            channel="email",
+        )
+        await self.ticket_repo.create(ticket)
+        logger.info(f"Ticket creado en Elastic: {ticket.ticket_id}")
+
+        # 5. Registrar interacción
+        logger.info("\n5. Registrando interacción en Elasticsearch...")
+        interaction = Interaction(
+            customer_id=juan_results.customer_id if juan_results else "unknown",
+            interaction_type="email",
+            direction="inbound",
+            subject="Re: Consulta pricing",
+            content="Cliente interesado en plan enterprise",
+            outcome="interested",
+            next_action="schedule_demo",
+            channel="email",
+        )
+        await self.interaction_repo.create(interaction)
+        logger.info(f"Interacción registrada: {interaction.interaction_id}")
+
+        # 6. Agente Elastic - Búsqueda semántica
+        logger.info("\n6. Agente Elastic - Búsqueda semántica...")
+        support_agent = self.orchestrator.get_agent("elastic_support_agent")
         if support_agent:
             result = await support_agent.execute({
-                "action": "create_ticket",
-                "customer_id": customers[1]["email"],
-                "subject": "Problema con login",
-                "description": "No puedo acceder a mi cuenta, dice que mi contraseña es incorrecta",
-                "channel": "email",
+                "action": "search",
+                "query": "cliente enterprise interesado pricing",
+                "top_k": 5,
             })
-            logger.info(f"Ticket creado: {result.data}")
+            logger.info(f"Búsqueda semántica: {result.data.get('total_found', 0)} resultados")
 
-        # 4. Agente de Marketing - Segmentar audiencia
-        logger.info("\n4. Agente de Marketing - Segmentando audiencia...")
-        marketing_agent = self.orchestrator.get_agent("marketing_agent")
-        if marketing_agent:
-            customer_list = [
-                {
-                    "customer_id": c["email"],
-                    "days_since_signup": 15 if i == 0 else 60 if i == 1 else 180,
-                    "total_purchases": 0 if i == 0 else 2 if i == 1 else 8,
-                    "days_since_last_activity": 5 if i == 0 else 45 if i == 1 else 10,
-                }
-                for i, c in enumerate(customers)
-            ]
-            result = await marketing_agent.execute({
-                "action": "segment",
-                "criteria": "behavior",
-                "customers": customer_list,
-            })
-            logger.info(f"Segmentación: {result.data}")
+        # 7. Agregaciones en Elasticsearch
+        logger.info("\n7. Agregaciones en Elasticsearch...")
+        agg_results = await self.customer_repo.aggregate({
+            "status_agg": {
+                "terms": {"field": "status"}
+            },
+            "avg_lead_score": {
+                "avg": {"field": "lead_score"}
+            }
+        })
+        logger.info(f"Agregaciones: {agg_results}")
 
-        # 5. Mostrar estado del sistema
-        logger.info("\n5. Estado del sistema:")
+        # 8. Mostrar estado del sistema
+        logger.info("\n8. Estado del sistema:")
         status = self.orchestrator.get_status()
-        logger.info(f"Agentes registrados: {status['agents_count']}")
-        logger.info(f"Clientes en CRM: {status['customers_count']}")
-        logger.info(f"Estado de agentes: {status['agents']}")
+        logger.info(f"Agentes Elastic registrados: {status['agents_count']}")
+        
+        customer_count = await self.customer_repo.count()
+        ticket_count = await self.ticket_repo.count()
+        interaction_count = await self.interaction_repo.count()
+        
+        logger.info(f"Clientes en Elastic: {customer_count}")
+        logger.info(f"Tickets en Elastic: {ticket_count}")
+        logger.info(f"Interacciones en Elastic: {interaction_count}")
 
-        logger.info("\n=== Demostración Completada ===")
+        logger.info("\n=== Demostración Elastic CRM Completada ===")
 
     async def run(self) -> None:
         """Ejecuta la aplicación."""
@@ -145,41 +236,14 @@ class CRMApplication:
         logger.info("Cerrando aplicación...")
         if self.orchestrator:
             await self.orchestrator.shutdown()
+        await elastic_client.close()
         logger.info("Aplicación cerrada")
         self._shutdown_event.set()
-
-    async def run_interactive(self) -> None:
-        """
-        Ejecuta la aplicación en modo interactivo.
-        Mantiene el proceso vivo para recibir tareas.
-        """
-        await self.initialize()
-
-        # Configurar signal handlers
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(
-                sig,
-                lambda: asyncio.create_task(self.shutdown()),
-            )
-
-        # Iniciar procesador de cola en background
-        queue_task = asyncio.create_task(self.orchestrator.process_queue())
-
-        logger.info("Sistema listo. Presiona Ctrl+C para salir.")
-
-        # Mantener ejecución
-        await self._shutdown_event.wait()
-        queue_task.cancel()
-        try:
-            await queue_task
-        except asyncio.CancelledError:
-            pass
 
 
 async def main():
     """Punto de entrada principal."""
-    app = CRMApplication()
+    app = ElasticCRMApplication()
     try:
         await app.run()
     except KeyboardInterrupt:

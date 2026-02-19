@@ -12,7 +12,7 @@ import yaml
 class Config:
     """
     Gestiona la configuración del sistema.
-    
+
     Carga configuración desde:
     1. Variables de entorno (.env)
     2. Archivo config.yaml
@@ -48,7 +48,7 @@ class Config:
         """Carga configuración desde config.yaml"""
         config_path = Path(__file__).parent.parent / "config" / "config.yaml"
         self.file_config = {}
-        
+
         if config_path.exists():
             with open(config_path, "r") as f:
                 self.file_config = yaml.safe_load(f) or {}
@@ -56,7 +56,7 @@ class Config:
     def get(self, key: str, default: Any = None) -> Any:
         """
         Obtiene un valor de configuración.
-        
+
         Primero busca en variables de entorno, luego en config.yaml.
         """
         # Buscar en variables de entorno
@@ -73,7 +73,7 @@ class Config:
             else:
                 value = None
                 break
-        
+
         return value if value is not None else default
 
     def get_int(self, key: str, default: int = 0) -> int:
@@ -97,6 +97,7 @@ class Config:
         value = self.get(key, str(default)).lower()
         return value in ("true", "1", "yes", "on")
 
+    # Propiedades LLM
     @property
     def llm_provider(self) -> str:
         """Proveedor LLM configurado."""
@@ -116,6 +117,32 @@ class Config:
     def log_level(self) -> str:
         """Nivel de logging."""
         return self.get("LOG_LEVEL", "INFO")
+
+    # Propiedades Elastic
+    @property
+    def elastic_host(self) -> str:
+        """Host de Elasticsearch."""
+        return self.get("ELASTIC_HOST", "http://localhost:9200")
+
+    @property
+    def elastic_user(self) -> str:
+        """Usuario de Elasticsearch."""
+        return self.get("ELASTIC_USER", "elastic")
+
+    @property
+    def elastic_password(self) -> str:
+        """Contraseña de Elasticsearch."""
+        return self.get("ELASTIC_PASSWORD", "changeme")
+
+    @property
+    def elastic_verify_certs(self) -> bool:
+        """Verificar certificados SSL de Elastic."""
+        return self.get_bool("ELASTIC_VERIFY_CERTS", False)
+
+    @property
+    def elastic_timeout(self) -> int:
+        """Timeout para conexiones a Elastic."""
+        return self.get_int("ELASTIC_TIMEOUT", 30)
 
 
 # Instancia global

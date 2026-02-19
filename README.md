@@ -1,37 +1,56 @@
-# Elastic CRM - Multi-Agent System
+# Elastic CRM - Multi-Agent System with Elastic Agent Builder
 
-Sistema multi-agente con orquestador para CRM agéntico. Gestiona clientes, ventas, soporte y marketing mediante agentes especializados coordinados por un orquestador central.
+Sistema multi-agente con orquestador para CRM agéntico, integrado con **Elasticsearch** y **Elastic Agent Builder**. Gestiona clientes, ventas, soporte y marketing mediante agentes especializados que utilizan búsqueda semántica y RAG sobre datos CRM almacenados en Elasticsearch.
 
 ## 🏗️ Arquitectura
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    CRM Orchestrator                         │
-│  ┌─────────────┬─────────────┬─────────────┬─────────────┐ │
-│  │  Registro   │  Tareas     │  Clientes   │  Estado     │ │
-│  │  Agentes    │  Cola       │  (CRM)      │  Global     │ │
-│  └─────────────┴─────────────┴─────────────┴─────────────┘ │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                    CRM Orchestrator                             │
+│  ┌─────────────┬─────────────┬─────────────┬─────────────────┐ │
+│  │  Registro   │  Tareas     │  Clientes   │  Estado         │ │
+│  │  Agentes    │  Cola       │  (Elastic)  │  Global         │ │
+│  └─────────────┴─────────────┴─────────────┴─────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
          │              │              │
          ▼              ▼              ▼
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│ SalesAgent  │ │SupportAgent │ │MarketingAgnt│
-│ - Qualify   │ │ - Tickets   │ │ - Segment   │
-│ - Follow-up │ │ - Classify  │ │ - Campaigns │
-│ - Meetings  │ │ - Responses │ │ - Engagement│
-└─────────────┘ └─────────────┘ └─────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│              Elastic Agent Builder                              │
+│  ┌─────────────┬─────────────┬─────────────┬─────────────────┐ │
+│  │  Semantic   │  RAG        │  Context    │  Tools          │ │
+│  │  Search     │  Retrieval  │  Building   │  Integration    │ │
+│  └─────────────┴─────────────┴─────────────┴─────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Elasticsearch Cluster                        │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐            │
+│  │ crm_customers│ │ crm_tickets  │ │ crm_         │            │
+│  │              │ │              │ │ interactions │            │
+│  └──────────────┘ └──────────────┘ └──────────────┘            │
+│  ┌──────────────┐                                              │
+│  │ crm_campaigns│                                              │
+│  └──────────────┘                                              │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ## 📁 Estructura del Proyecto
 
 ```
 Elastic/
-├── agents/                 # Módulos de agentes
+├── agents/                 # Agentes base y especializados
 │   ├── base.py            # Clase base abstracta
-│   ├── sales.py           # Agente de Ventas
-│   ├── support.py         # Agente de Soporte
-│   ├── marketing.py       # Agente de Marketing
+│   ├── sales.py           # Agente de Ventas (standard)
+│   ├── support.py         # Agente de Soporte (standard)
+│   ├── marketing.py       # Agente de Marketing (standard)
 │   └── specialized.py     # Exportaciones
+├── elastic/               # Integración con Elastic Stack
+│   ├── __init__.py        # Módulo Elastic
+│   ├── client.py          # Cliente Elasticsearch
+│   ├── models.py          # Modelos de datos CRM
+│   ├── repository.py      # Repositorios CRUD
+│   └── agent_builder.py   # Elastic Agent Builder
 ├── orchestrator/          # Orquestador CRM
 │   └── orchestrator.py    # CRMOrchestrator
 ├── config/                # Configuración
@@ -44,12 +63,18 @@ Elastic/
 ├── main.py                # Punto de entrada
 ├── requirements.txt       # Dependencias
 ├── pyproject.toml         # Metadatos del proyecto
-└── .env.example           # Variables de entorno ejemplo
+├── .env.example           # Variables de entorno ejemplo
+└── README.md              # Documentación
 ```
 
 ## 🚀 Instalación
 
-1. **Activar entorno virtual:**
+### 1. Requisitos previos
+
+- Python 3.10+
+- Elasticsearch 8.x (local o Elastic Cloud)
+
+### 2. Activar entorno virtual:
 ```bash
 # Windows
 .venv\Scripts\activate
@@ -58,18 +83,30 @@ Elastic/
 source .venv/bin/activate
 ```
 
-2. **Instalar dependencias:**
+### 3. Instalar dependencias:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **Configurar variables de entorno:**
+### 4. Configurar variables de entorno:
 ```bash
 # Copiar archivo de ejemplo
 copy .env.example .env  # Windows
 cp .env.example .env    # Linux/Mac
+```
 
-# Editar .env con tus credenciales
+Editar `.env` con tu configuración de Elastic:
+```env
+# Elastic Stack Configuration
+ELASTIC_HOST=http://localhost:9200
+ELASTIC_USER=elastic
+ELASTIC_PASSWORD=tu_password
+ELASTIC_VERIFY_CERTS=false
+
+# LLM Configuration (para Elastic Agent Builder)
+OPENAI_API_KEY=sk-...
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4o
 ```
 
 ## 💡 Uso Básico
@@ -82,137 +119,304 @@ python main.py
 ### Uso programático:
 ```python
 import asyncio
+from elastic import (
+    elastic_client,
+    CustomerRepository,
+    Customer,
+    create_elastic_sales_agent,
+)
 from orchestrator import CRMOrchestrator
-from agents.specialized import SalesAgent, SupportAgent, MarketingAgent
 
 async def main():
-    # Crear orquestador
-    orchestrator = CRMOrchestrator()
+    # Conectar a Elasticsearch
+    await elastic_client.ping()
     
-    # Registrar agentes
-    await orchestrator.register_agent(SalesAgent())
-    await orchestrator.register_agent(SupportAgent())
-    await orchestrator.register_agent(MarketingAgent())
+    # Crear repositorio
+    customer_repo = CustomerRepository()
+    await customer_repo.initialize()
     
     # Agregar cliente
-    customer = orchestrator.add_customer({
-        "name": "Juan Pérez",
-        "email": "juan@example.com",
-        "status": "lead"
-    })
+    customer = Customer(
+        name="Juan Pérez",
+        email="juan@example.com",
+        company="TechCorp",
+        status="lead",
+        lead_score=75,
+    )
+    await customer_repo.create(customer)
     
-    # Ejecutar tarea con agente de ventas
-    sales_agent = orchestrator.get_agent("sales_agent")
-    result = await sales_agent.execute({
-        "action": "qualify_lead",
+    # Búsqueda en Elastic
+    results = await customer_repo.find_by_email("juan@example.com")
+    print(f"Encontrado: {results.name}")
+    
+    # Crear agente Elastic
+    orchestrator = CRMOrchestrator()
+    agent = create_elastic_sales_agent()
+    await orchestrator.register_agent(agent)
+    
+    # Analizar cliente con RAG
+    result = await agent.execute({
+        "action": "analyze",
         "customer_id": customer.customer_id,
-        "data": {
-            "budget": 5000,
-            "has_authority": True,
-            "need_score": 80,
-            "timeline": "this_month"
-        }
     })
-    
-    print(f"Calificación: {result.data}")
+    print(f"Análisis: {result.data}")
     
     # Limpiar
     await orchestrator.shutdown()
+    await elastic_client.close()
 
 asyncio.run(main())
 ```
 
-## 🤖 Agentes Disponibles
+## 🤖 Elastic Agent Builder
 
-### SalesAgent (Ventas)
-| Acción | Descripción |
-|--------|-------------|
-| `qualify_lead` | Califica leads usando criterios BANT |
-| `follow_up` | Genera plan de seguimiento |
-| `schedule_meeting` | Programa reuniones |
-| `analyze` | Analiza probabilidad de cierre |
+El **Elastic Agent Builder** permite crear agentes que utilizan Elasticsearch para:
 
-### SupportAgent (Soporte)
-| Acción | Descripción |
-|--------|-------------|
-| `create_ticket` | Crea ticket de soporte |
-| `classify` | Clasifica automáticamente incidencias |
-| `suggest_response` | Sugiere respuestas basadas en categoría |
-| `escalate` | Escala tickets a nivel superior |
-| `resolve` | Marca tickets como resueltos |
+### Características
 
-### MarketingAgent (Marketing)
-| Acción | Descripción |
-|--------|-------------|
-| `segment` | Segmenta audiencia por comportamiento |
-| `create_campaign` | Crea campañas de marketing |
-| `analyze_engagement` | Analiza nivel de engagement |
-| `recommend_content` | Recomienda contenido personalizado |
+| Característica | Descripción |
+|---------------|-------------|
+| **Semantic Search** | Búsqueda full-text con fuzzy matching en todos los índices CRM |
+| **RAG** | Retrieval Augmented Generation con contexto de Elastic |
+| **Aggregations** | Análisis de datos con agregaciones de Elasticsearch |
+| **Context Building** | Construcción automática de contexto para LLMs |
 
-## 📊 CRM Orchestrator
-
-El orquestador proporciona:
-
-- **Gestión de Agentes**: Registro, baja y monitoreo de agentes
-- **CRM de Clientes**: Alta, actualización y listado de clientes
-- **Cola de Tareas**: Distribución asíncrona de tareas a agentes
-- **Estado Global**: Monitoreo centralizado del sistema
-
-### Métodos principales:
+### Acciones disponibles:
 
 ```python
-# Agentes
-await orchestrator.register_agent(agent)
-await orchestrator.unregister_agent("agent_name")
-orchestrator.get_agent("agent_name")
-orchestrator.list_agents()
+# Búsqueda semántica
+result = await agent.execute({
+    "action": "search",
+    "query": "cliente enterprise interesado",
+    "index": "customers",
+    "top_k": 5,
+})
 
-# Clientes
-orchestrator.add_customer({...})
-orchestrator.get_customer(customer_id)
-orchestrator.update_customer(customer_id, {...})
-orchestrator.list_customers(status="lead")
+# Análisis de cliente con contexto
+result = await agent.execute({
+    "action": "analyze",
+    "customer_id": "customer-123",
+    "include_interactions": True,
+    "include_tickets": True,
+})
 
-# Tareas
-await orchestrator.assign_task("sales_agent", {...}, priority=1)
-await orchestrator.process_queue()  # Background
+# Agregaciones
+result = await agent.execute({
+    "action": "aggregate",
+    "index": "customers",
+    "aggregation_type": "terms",
+    "field": "status",
+})
 
-# Estado
-orchestrator.get_status()
+# Recuperar contexto para RAG
+result = await agent.execute({
+    "action": "retrieve_context",
+    "query": "historial de compras del cliente",
+    "context_types": ["customers", "interactions", "tickets"],
+})
+```
+
+### Crear agentes personalizados:
+
+```python
+from elastic import ElasticAgentBuilder, ElasticAgentConfig
+from elastic import CustomerRepository, TicketRepository
+
+config = ElasticAgentConfig(
+    enable_semantic_search=True,
+    enable_rag=True,
+    top_k_results=10,
+)
+
+agent = ElasticAgentBuilder("mi_agente") \
+    .with_config(config) \
+    .with_repository("customers", CustomerRepository()) \
+    .with_repository("tickets", TicketRepository()) \
+    .with_description("Mi agente personalizado") \
+    .build()
+```
+
+## 📊 Modelos de Datos
+
+### Customer (crm_customers)
+```python
+Customer(
+    customer_id="uuid",
+    name="Juan Pérez",
+    email="juan@example.com",
+    company="TechCorp",
+    status="lead",  # lead, prospect, customer, inactive, champion
+    lead_score=75,
+    engagement_score=60,
+    lifetime_value=0.0,
+    tags=["enterprise", "hot_lead"],
+)
+```
+
+### Ticket (crm_tickets)
+```python
+Ticket(
+    ticket_id="uuid",
+    customer_id="customer-uuid",
+    subject="Problema con login",
+    description="...",
+    status="open",  # open, in_progress, pending, resolved, closed
+    priority="medium",  # low, medium, high, critical
+    category="access_management",
+    channel="email",
+)
+```
+
+### Interaction (crm_interactions)
+```python
+Interaction(
+    interaction_id="uuid",
+    customer_id="customer-uuid",
+    interaction_type="email",  # email, call, meeting, chat, social
+    direction="inbound",  # inbound, outbound
+    subject="Re: Consulta",
+    content="...",
+    outcome="interested",
+    next_action="schedule_demo",
+)
+```
+
+### Campaign (crm_campaigns)
+```python
+Campaign(
+    campaign_id="uuid",
+    name="Q1 Email Campaign",
+    campaign_type="email",
+    status="active",  # draft, active, paused, completed
+    target_segment="enterprise",
+    sent_count=100,
+    opened_count=45,
+    clicked_count=12,
+)
+```
+
+## 🔍 Búsquedas en Elasticsearch
+
+### Repositorio de Clientes:
+```python
+repo = CustomerRepository()
+
+# Búsqueda por email
+customer = await repo.find_by_email("juan@example.com")
+
+# Búsqueda por estado
+leads = await repo.find_by_status("lead")
+
+# Búsqueda fuzzy por nombre
+results = await repo.search_by_name("Juan Peres")
+
+# Búsqueda custom
+results = await repo.search({
+    "bool": {
+        "must": [{"match": {"company": "TechCorp"}}],
+        "filter": [{"range": {"lead_score": {"gte": 50}}}]
+    }
+})
+```
+
+### Repositorio de Tickets:
+```python
+repo = TicketRepository()
+
+# Tickets de un cliente
+tickets = await repo.find_by_customer("customer-uuid")
+
+# Tickets abiertos
+open_tickets = await repo.find_open_tickets()
+
+# Tickets con SLA vencido
+overdue = await repo.find_overdue_tickets()
+```
+
+### Repositorio de Interacciones:
+```python
+repo = InteractionRepository()
+
+# Historial de un cliente
+history = await repo.find_by_customer("customer-uuid")
+
+# Interacciones recientes (últimos 7 días)
+recent = await repo.find_recent("customer-uuid", days=7)
 ```
 
 ## ⚙️ Configuración
 
 ### config/config.yaml
 ```yaml
+# Elastic Stack
+elastic:
+  host: http://localhost:9200
+  user: elastic
+  password: changeme
+  verify_certs: false
+  indices:
+    customers: crm_customers
+    tickets: crm_tickets
+    interactions: crm_interactions
+    campaigns: crm_campaigns
+
+# LLM para Elastic Agent Builder
 llm:
   provider: openai
   model: gpt-4o
   temperature: 0.7
 
+# Agentes
 agents:
   sales:
-    enabled: true
-    auto_qualify_leads: true
-  support:
-    enabled: true
-    auto_classify_tickets: true
-  marketing:
-    enabled: true
-    auto_segment: true
-
-logging:
-  level: INFO
-  file: logs/app.log
+    type: elastic  # elastic o standard
+    semantic_search: true
+    rag_enabled: true
 ```
 
-### Variables de entorno (.env)
+### Elastic Cloud (alternativa):
 ```env
-OPENAI_API_KEY=sk-...
-LLM_PROVIDER=openai
-LLM_MODEL=gpt-4o
-TEMPERATURE=0.7
-LOG_LEVEL=INFO
+ELASTIC_CLOUD_ID=your_cloud_id:region
+ELASTIC_CLOUD_API_KEY=your_api_key
+```
+
+## 📈 Casos de Uso
+
+### 1. Ventas - Calificación de Leads con contexto
+```python
+agent = create_elastic_sales_agent()
+result = await agent.execute({
+    "action": "analyze",
+    "customer_id": customer_id,
+})
+# Retorna: health_score, recommendations, historial completo
+```
+
+### 2. Soporte - Búsqueda de tickets similares
+```python
+agent = create_elastic_support_agent()
+result = await agent.execute({
+    "action": "search",
+    "query": "problema login contraseña incorrecta",
+    "index": "tickets",
+})
+# Retorna: tickets similares para resolución rápida
+```
+
+### 3. Marketing - Segmentación con agregaciones
+```python
+repo = CustomerRepository()
+segments = await repo.aggregate({
+    "status_breakdown": {
+        "terms": {"field": "status"}
+    },
+    "avg_engagement_by_status": {
+        "terms": {"field": "status"},
+        "aggs": {
+            "avg_engagement": {"avg": {"field": "engagement_score"}}
+        }
+    }
+})
 ```
 
 ## 🧪 Desarrollo
@@ -227,10 +431,15 @@ pip install -e ".[dev]"
 pytest tests/
 ```
 
-### Linting:
+### Docker para Elasticsearch local:
 ```bash
-ruff check .
-black .
+docker run -d \
+  --name elasticsearch \
+  -p 9200:9200 \
+  -p 9300:9300 \
+  -e "discovery.type=single-node" \
+  -e "xpack.security.enabled=false" \
+  elasticsearch:8.11.0
 ```
 
 ## 📝 Licencia

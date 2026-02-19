@@ -1,10 +1,15 @@
-# Multi-Agent CRM Framework
+# Multi-Agent CRM Framework con Elastic
 langchain>=0.1.0
 langchain-core>=0.1.0
 langgraph>=0.0.1
+langchain-elasticsearch>=0.2.0
 pydantic>=2.0.0
 python-dotenv>=1.0.0
 asyncio>=3.4.3
 aiohttp>=3.9.0
 pyyaml>=6.0
 loguru>=0.7.0
+
+# Elastic Stack
+elasticsearch>=8.0.0
+elastic-transport>=8.0.0
