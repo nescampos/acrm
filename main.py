@@ -7,6 +7,7 @@ y Elastic Agent Builder.
 import argparse
 import asyncio
 import signal
+import json
 from typing import Optional
 
 from loguru import logger
@@ -232,6 +233,64 @@ class ElasticCRMApplication:
         if run_demo:
             await self.run_demo()
 
+    async def run_chat(self) -> None:
+        """
+        Modo consola interactivo.
+
+        - Rutea cada mensaje con OpenAI (router del orquestador)
+        - Ejecuta el agente Kibana correspondiente
+        - Mantiene conversation_id por agente cuando Kibana lo devuelve
+        """
+        await self.initialize()
+        assert self.orchestrator is not None
+
+        logger.info("Modo chat iniciado. Comandos: /agents, /exit")
+        conversation_ids: dict[str, str] = {}
+
+        while True:
+            try:
+                user_input = await asyncio.to_thread(input, "crm> ")
+            except EOFError:
+                break
+
+            user_input = (user_input or "").strip()
+            if not user_input:
+                continue
+            if user_input.lower() in ("/exit", "/quit"):
+                break
+            if user_input.lower() == "/agents":
+                agents = self.orchestrator.list_agents()
+                print(json.dumps(agents, ensure_ascii=False, indent=2))
+                continue
+
+            try:
+                route = await self.orchestrator.route_agent(user_input)
+                agent_name = route.agent_name
+                conv_id = conversation_ids.get(agent_name)
+
+                result = await self.orchestrator.execute_on_agent(
+                    agent_name=agent_name,
+                    user_input=user_input,
+                    conversation_id=conv_id,
+                )
+
+                if result.success and isinstance(result.data, dict):
+                    new_conv = result.data.get("conversation_id") or result.data.get("conversationId")
+                    if isinstance(new_conv, str) and new_conv:
+                        conversation_ids[agent_name] = new_conv
+
+                if result.success:
+                    payload = result.data
+                    if isinstance(payload, dict) and isinstance(payload.get("message"), str):
+                        output = payload["message"]
+                    else:
+                        output = json.dumps(payload, ensure_ascii=False, indent=2)
+                    print(f"[{agent_name}] {output}")
+                else:
+                    print(f"[{agent_name}] ERROR: {result.error}")
+            except Exception as e:
+                print(f"[error] {e}")
+
     async def shutdown(self) -> None:
         """Aplica el shutdown graceful."""
         logger.info("Cerrando aplicación...")
@@ -247,15 +306,24 @@ class ElasticCRMApplication:
 async def main():
     """Punto de entrada principal."""
     parser = argparse.ArgumentParser()
-    parser.add_argument(
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
         "--demo",
         action="store_true",
         help="Ejecutar la demo que inserta datos en Elasticsearch",
     )
+    group.add_argument(
+        "--chat",
+        action="store_true",
+        help="Iniciar modo chat en consola (ruteo + agentes Kibana)",
+    )
     args = parser.parse_args()
     app = ElasticCRMApplication()
     try:
-        await app.run(run_demo=args.demo)
+        if args.chat:
+            await app.run_chat()
+        else:
+            await app.run(run_demo=args.demo)
     except KeyboardInterrupt:
         logger.info("Interrupción recibida")
     finally:

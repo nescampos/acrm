@@ -16,6 +16,8 @@ import uuid
 from loguru import logger
 
 from agents.base import BaseAgent, AgentResponse, AgentStatus
+from config import config
+from .router import OpenAIRouter, RouteResult
 
 
 @dataclass
@@ -77,14 +79,33 @@ class CRMOrchestrator:
     - Flujos de trabajo automatizados
     """
 
-    def __init__(self, config: Optional[dict] = None):
+    def __init__(self, config: Optional[dict] = None, router: Optional[OpenAIRouter] = None):
         self.config = config or {}
         self.agents: dict[str, BaseAgent] = {}
         self.customers: dict[str, CustomerRecord] = {}
         self.tasks: dict[str, Task] = {}
         self._running = False
         self._task_queue: asyncio.Queue = asyncio.Queue()
+        self._router: Optional[OpenAIRouter] = router or self._build_default_router()
         logger.info("CRM Orchestrator initialized")
+
+    def _build_default_router(self) -> Optional[OpenAIRouter]:
+        """
+        Crea el router por defecto basado en OpenAI si existe `OPENAI_API_KEY`.
+
+        - Modelo: `ROUTER_MODEL` o `LLM_MODEL` (por defecto `gpt-4o`)
+        - Temperatura: 0 (ruteo determinista)
+        """
+        api_key = config.get("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("OPENAI_API_KEY no configurada: ruteo LLM deshabilitado")
+            return None
+        model = config.get("ROUTER_MODEL", config.llm_model)
+        try:
+            return OpenAIRouter(api_key=api_key, model=model, temperature=0.0)
+        except Exception as e:
+            logger.error(f"No se pudo inicializar OpenAIRouter: {e}")
+            return None
 
     async def register_agent(self, agent: BaseAgent) -> bool:
         """
@@ -138,6 +159,64 @@ class CRMOrchestrator:
             }
             for agent in self.agents.values()
         ]
+
+    async def route_agent(self, user_input: str) -> RouteResult:
+        """
+        Decide qué agente debe atender `user_input` usando el router LLM.
+        """
+        if not self._router:
+            raise RuntimeError(
+                "Router no configurado. Define OPENAI_API_KEY (y opcionalmente ROUTER_MODEL)."
+            )
+        return await self._router.route(user_input=user_input, agents=self.list_agents())
+
+    async def execute_on_agent(
+        self,
+        agent_name: str,
+        user_input: str,
+        conversation_id: Optional[str] = None,
+        priority: int = 0,
+    ) -> AgentResponse:
+        """
+        Ejecuta un mensaje del usuario en un agente específico (sin ruteo).
+
+        Para agentes Kibana (`KibanaAgentWrapper`) se envía como:
+          {"input": user_input, "conversation_id": ...}
+        """
+        if agent_name not in self.agents:
+            return AgentResponse(success=False, error=f"Agent {agent_name} not found")
+
+        input_data: dict[str, Any] = {"input": user_input}
+        if conversation_id:
+            input_data["conversation_id"] = conversation_id
+
+        task = Task(agent_name=agent_name, input_data=input_data, priority=priority)
+        self.tasks[task.task_id] = task
+        logger.info(f"Task {task.task_id} assigned to {agent_name} (direct)")
+        return await self.execute_task(task)
+
+    async def route_and_execute(
+        self,
+        user_input: str,
+        conversation_id: Optional[str] = None,
+        priority: int = 0,
+    ) -> AgentResponse:
+        """
+        Funciona como ruteador: recibe la instrucción del usuario, detecta el agente,
+        y ejecuta la petición en el agente seleccionado.
+
+        Nota: para agentes Kibana (`KibanaAgentWrapper`) se envía en `input_data` como:
+          {"input": user_input, "conversation_id": ...}
+        """
+        route = await self.route_agent(user_input)
+        agent_name = route.agent_name
+        logger.info(f"Routed to agent={agent_name} reasoning={route.reasoning}")
+        return await self.execute_on_agent(
+            agent_name=agent_name,
+            user_input=user_input,
+            conversation_id=conversation_id,
+            priority=priority,
+        )
 
     # Customer Management
     def add_customer(self, customer_data: dict) -> CustomerRecord:
