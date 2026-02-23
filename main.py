@@ -4,7 +4,7 @@ Main - Punto de entrada de la aplicación CRM con Elastic.
 Ejemplo de uso del sistema multi-agente integrado con Elasticsearch
 y Elastic Agent Builder.
 """
-
+import argparse
 import asyncio
 import signal
 from typing import Optional
@@ -226,10 +226,11 @@ class ElasticCRMApplication:
 
         logger.info("\n=== Demostración Elastic CRM Completada ===")
 
-    async def run(self) -> None:
+    async def run(self, run_demo: bool = False) -> None:
         """Ejecuta la aplicación."""
         await self.initialize()
-        await self.run_demo()
+        if run_demo:
+            await self.run_demo()
 
     async def shutdown(self) -> None:
         """Aplica el shutdown graceful."""
@@ -243,9 +244,16 @@ class ElasticCRMApplication:
 
 async def main():
     """Punto de entrada principal."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="Ejecutar la demo que inserta datos en Elasticsearch",
+    )
+    args = parser.parse_args()
     app = ElasticCRMApplication()
     try:
-        await app.run()
+        await app.run(run_demo=args.demo)
     except KeyboardInterrupt:
         logger.info("Interrupción recibida")
     finally:

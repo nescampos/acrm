@@ -149,6 +149,11 @@ class Config:
         """API Key de Elasticsearch Cloud."""
         return self.get("ELASTIC_CLOUD_API_KEY")
 
+    @property
+    def kibana_host(self) -> str:
+        """Host de Kibana."""
+        return self.get("KIBANA_HOST")
+
 
 # Instancia global
 config = Config()
