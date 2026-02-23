@@ -13,6 +13,10 @@ loguru>=0.7.0
 # Routing (OpenAI SDK)
 openai==2.21.0
 
+# Web app
+fastapi
+uvicorn[standard]
+
 # Elastic Stack
 elasticsearch>=8.0.0
 elastic-transport>=8.0.0

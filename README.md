@@ -121,6 +121,24 @@ LLM_MODEL=gpt-4o
 python main.py
 ```
 
+### Modo Web (FastAPI)
+
+1) Instalar dependencias:
+
+```bash
+pip install -r requirements.txt
+```
+
+2) Ejecutar servidor:
+
+```bash
+uvicorn webapp.server:app --reload --port 8000
+```
+
+3) Abrir en el navegador: `http://localhost:8000`
+
+La web reutiliza el mismo flujo que consola: el usuario escribe un mensaje, el **orquestador rutea con OpenAI** y delega al **agente de Kibana** correspondiente.
+
 ### Uso programático:
 ```python
 import asyncio

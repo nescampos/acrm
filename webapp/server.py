@@ -1,0 +1,223 @@
+from __future__ import annotations
+
+import json
+import uuid
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from typing import Any, Optional
+
+from fastapi import Cookie, FastAPI, Request, Response
+from fastapi.responses import HTMLResponse, JSONResponse
+from loguru import logger
+
+from main import ElasticCRMApplication
+
+
+@dataclass
+class ChatRequest:
+    message: str
+
+
+def _extract_text(payload: Any) -> str:
+    if isinstance(payload, dict) and isinstance(payload.get("message"), str):
+        return payload["message"]
+    if isinstance(payload, str):
+        return payload
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Inicializa una vez: índices + agentes Kibana + orquestador
+    crm = ElasticCRMApplication()
+    await crm.initialize()
+
+    app.state.crm = crm
+    # session_id -> { agent_name -> conversation_id }
+    app.state.sessions: dict[str, dict[str, str]] = {}
+    logger.info("Webapp initialized")
+    try:
+        yield
+    finally:
+        await crm.shutdown()
+        logger.info("Webapp shutdown complete")
+
+
+app = FastAPI(title="Elastic CRM Web", lifespan=lifespan)
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    # UI mínima (sin dependencias externas)
+    return HTMLResponse(
+        """
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Elastic CRM Chat</title>
+    <style>
+      :root { color-scheme: light; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background: #0b1220; color: #e6edf7; }
+      .wrap { max-width: 920px; margin: 0 auto; padding: 24px; }
+      .card { background: #121b2f; border: 1px solid #223255; border-radius: 14px; padding: 18px; }
+      h1 { font-size: 18px; margin: 0 0 12px; }
+      .sub { color: #9fb2d0; font-size: 13px; margin: 0 0 14px; }
+      #log { height: 55vh; overflow: auto; padding: 12px; background: #0e1730; border: 1px solid #223255; border-radius: 12px; }
+      .msg { margin: 10px 0; line-height: 1.35; }
+      .me { color: #d7e3ff; }
+      .bot { color: #c7f0d8; }
+      .meta { color: #94a6c6; font-size: 12px; margin-bottom: 4px; }
+      .row { display: flex; gap: 10px; margin-top: 12px; }
+      textarea { flex: 1; resize: none; height: 70px; padding: 10px; border-radius: 12px; border: 1px solid #223255; background: #0e1730; color: #e6edf7; }
+      button { width: 140px; border-radius: 12px; border: 1px solid #2a3c64; background: #1b2a4d; color: #e6edf7; font-weight: 600; cursor: pointer; }
+      button:disabled { opacity: 0.6; cursor: not-allowed; }
+      .bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+      .pill { font-size: 12px; padding: 6px 10px; border-radius: 999px; border: 1px solid #223255; background: #0e1730; color: #9fb2d0; }
+      a { color: #9fc2ff; text-decoration: none; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>Elastic CRM Chat</h1>
+        <p class="sub">Router (OpenAI) → Agente Kibana (Agent Builder). Comandos: <span class="pill">/agents</span></p>
+        <div id="log"></div>
+        <div class="row">
+          <textarea id="input" placeholder="Escribe tu solicitud…"></textarea>
+          <button id="send">Enviar</button>
+        </div>
+        <div class="bar">
+          <span class="pill" id="status">Listo</span>
+          <a href="/docs" target="_blank">API docs</a>
+        </div>
+      </div>
+    </div>
+    <script>
+      const log = document.getElementById('log');
+      const input = document.getElementById('input');
+      const send = document.getElementById('send');
+      const status = document.getElementById('status');
+
+      function addMsg(who, meta, text) {
+        const div = document.createElement('div');
+        div.className = 'msg ' + (who === 'me' ? 'me' : 'bot');
+        div.innerHTML = `<div class="meta">${meta}</div><div style="white-space: pre-wrap">${text}</div>`;
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+      }
+
+      async function postChat(message) {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message})
+        });
+        return await res.json();
+      }
+
+      async function handleSend() {
+        const message = input.value.trim();
+        if (!message) return;
+        input.value = '';
+        addMsg('me', 'Tú', message);
+        send.disabled = true;
+        status.textContent = 'Procesando…';
+        try {
+          if (message === '/agents') {
+            const res = await fetch('/api/agents');
+            const data = await res.json();
+            addMsg('bot', 'Sistema', JSON.stringify(data, null, 2));
+            return;
+          }
+          const data = await postChat(message);
+          if (data.ok) {
+            addMsg('bot', `Agente: ${data.agent}`, data.text);
+          } else {
+            addMsg('bot', 'Error', data.error || 'Error desconocido');
+          }
+        } catch (e) {
+          addMsg('bot', 'Error', String(e));
+        } finally {
+          send.disabled = false;
+          status.textContent = 'Listo';
+        }
+      }
+
+      send.addEventListener('click', handleSend);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+          handleSend();
+        }
+      });
+    </script>
+  </body>
+</html>
+        """.strip()
+    )
+
+
+@app.get("/api/agents")
+async def api_agents(request: Request):
+    crm: ElasticCRMApplication = request.app.state.crm
+    return JSONResponse(crm.orchestrator.list_agents())  # type: ignore[union-attr]
+
+
+@app.post("/api/chat")
+async def api_chat(
+    request: Request,
+    response: Response,
+    payload: dict,
+    crm_session: Optional[str] = Cookie(default=None),
+):
+    crm: ElasticCRMApplication = request.app.state.crm
+    orchestrator = crm.orchestrator
+    if orchestrator is None:
+        return JSONResponse({"ok": False, "error": "Orchestrator not initialized"}, status_code=500)
+
+    message = (payload.get("message") or "").strip()
+    if not message:
+        return JSONResponse({"ok": False, "error": "Missing message"}, status_code=400)
+
+    session_id = crm_session or str(uuid.uuid4())
+    if crm_session is None:
+        response.set_cookie("crm_session", session_id, httponly=True, samesite="lax")
+
+    sessions: dict[str, dict[str, str]] = request.app.state.sessions
+    session_state = sessions.setdefault(session_id, {})
+
+    try:
+        route = await orchestrator.route_agent(message)
+        agent_name = route.agent_name
+        conv_id = session_state.get(agent_name)
+
+        result = await orchestrator.execute_on_agent(
+            agent_name=agent_name,
+            user_input=message,
+            conversation_id=conv_id,
+        )
+
+        if result.success and isinstance(result.data, dict):
+            new_conv = result.data.get("conversation_id") or result.data.get("conversationId")
+            if isinstance(new_conv, str) and new_conv:
+                session_state[agent_name] = new_conv
+
+        if not result.success:
+            return JSONResponse(
+                {"ok": False, "agent": agent_name, "error": result.error},
+                status_code=500,
+            )
+
+        return JSONResponse(
+            {
+                "ok": True,
+                "agent": agent_name,
+                "reasoning": route.reasoning,
+                "text": _extract_text(result.data),
+                "raw": result.data,
+            }
+        )
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
