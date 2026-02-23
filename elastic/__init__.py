@@ -24,7 +24,15 @@ from .agent_builder import (
     create_elastic_sales_agent,
     create_elastic_support_agent,
     create_elastic_marketing_agent,
+    get_kibana_client,
+    KibanaAgentWrapper,
+    create_kibana_agent_wrapper,
+    build_crm_agent_payload,
+    ensure_crm_agents_in_kibana,
+    create_and_register_crm_agents,
+    CRM_AGENTS,
 )
+from .kibana_agent_builder_client import KibanaAgentBuilderClient
 
 __all__ = [
     "ElasticClient",
@@ -44,4 +52,12 @@ __all__ = [
     "create_elastic_sales_agent",
     "create_elastic_support_agent",
     "create_elastic_marketing_agent",
+    "KibanaAgentBuilderClient",
+    "get_kibana_client",
+    "KibanaAgentWrapper",
+    "create_kibana_agent_wrapper",
+    "build_crm_agent_payload",
+    "ensure_crm_agents_in_kibana",
+    "create_and_register_crm_agents",
+    "CRM_AGENTS",
 ]

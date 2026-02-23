@@ -151,8 +151,13 @@ class Config:
 
     @property
     def kibana_host(self) -> str:
-        """Host de Kibana."""
-        return self.get("KIBANA_HOST")
+        """Host de Kibana (para Agent Builder API)."""
+        return self.get("KIBANA_HOST") or self.get("kibana.host", "http://localhost:5601")
+
+    @property
+    def kibana_space(self) -> str:
+        """Space de Kibana (vacío = default)."""
+        return self.get("KIBANA_SPACE") or self.get("kibana.space", "")
 
 
 # Instancia global

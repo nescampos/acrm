@@ -18,6 +18,12 @@ elastic:
     interactions: crm_interactions
     campaigns: crm_campaigns
 
+# Kibana - API Agent Builder (gestión de agentes y chat)
+kibana:
+  host: http://localhost:5601
+  api_key: ""
+  space: ""  # opcional, ej: default o my-space. Vacío = espacio por defecto
+
 # Configuración LLM para Elastic Agent Builder
 llm:
   provider: openai

@@ -1,10 +1,11 @@
 """
 Elastic Agent Builder - Integración con Elastic AI Assistant.
 
-Proporciona agentes que utilizan Elasticsearch para:
-- Búsqueda semántica de datos CRM
-- RAG (Retrieval Augmented Generation) con datos del cliente
-- Análisis de tendencias y patrones
+Proporciona:
+- Agentes locales (ElasticBaseAgent) con búsqueda/RAG sobre Elasticsearch.
+- Integración con la API de Kibana (Elastic Agent Builder) para gestionar
+  agentes, tools y conversaciones de forma programática.
+Ref: https://www.elastic.co/docs/explore-analyze/ai-features/agent-builder/kibana-api
 """
 
 from dataclasses import dataclass, field
@@ -12,7 +13,7 @@ from typing import Any, Optional
 from datetime import datetime
 import json
 
-from agents.base import BaseAgent, AgentResponse, AgentState
+from agents.base import BaseAgent, AgentResponse, AgentState, AgentStatus
 from elastic.repository import (
     CustomerRepository,
     TicketRepository,
@@ -20,6 +21,9 @@ from elastic.repository import (
     CampaignRepository,
 )
 from loguru import logger
+
+from config import config
+from .kibana_agent_builder_client import KibanaAgentBuilderClient
 
 
 @dataclass
@@ -121,7 +125,7 @@ class ElasticBaseAgent(BaseAgent):
         Returns:
             AgentResponse con resultados.
         """
-        self.state.status = AgentState.WORKING
+        self.state.status = AgentStatus.WORKING
         self.state.last_updated = datetime.now()
 
         try:
@@ -156,7 +160,7 @@ class ElasticBaseAgent(BaseAgent):
                 agent_id=self.state.agent_id,
             )
         finally:
-            self.state.status = AgentState.IDLE
+            self.state.status = AgentStatus.IDLE
 
     async def _search(self, input_data: dict) -> dict:
         """
@@ -402,6 +406,256 @@ class ElasticBaseAgent(BaseAgent):
     def get_available_tools(self) -> list[dict]:
         """Retorna herramientas disponibles para el agente."""
         return self._tools
+
+
+# ---------- Integración API Kibana (Elastic Agent Builder) ----------
+
+
+def get_kibana_client() -> Optional[KibanaAgentBuilderClient]:
+    """
+    Retorna un cliente para la API de Elastic Agent Builder en Kibana
+    si están configurados KIBANA_HOST y ELASTIC_CLOUD_API_KEY. Si no, retorna None.
+    """
+    host = config.get("KIBANA_HOST")
+    api_key = config.get("ELASTIC_CLOUD_API_KEY")
+    if not host or not api_key:
+        return None
+    return KibanaAgentBuilderClient(
+        base_url=host,
+        api_key=api_key,
+        space=config.kibana_space,
+    )
+
+
+# Definición de los agentes CRM que se crean en Kibana al arrancar
+CRM_AGENTS = [
+    {
+        "id": "crm_sales_agent",
+        "name": "Ventas CRM",
+        "description": "Agente de Ventas: califica leads, analiza oportunidades en índices crm_*",
+        "instructions": (
+            "Eres un agente de ventas. Usa las herramientas de búsqueda para consultar "
+            "los índices crm_customers y crm_interactions. Ayuda a calificar leads, "
+            "analizar oportunidades y recomendar siguientes pasos. Responde en español."
+        ),
+        "tool_ids": [
+            "platform.core.search",
+            "platform.core.list_indices",
+            "platform.core.get_document_by_id",
+        ],
+        "labels": ["crm", "elastic-crm", "sales"],
+    },
+    {
+        "id": "crm_support_agent",
+        "name": "Soporte CRM",
+        "description": "Agente de Soporte: gestiona tickets, analiza historial en índices crm_*",
+        "instructions": (
+            "Eres un agente de soporte. Usa las herramientas para consultar "
+            "crm_tickets, crm_customers y crm_interactions. Ayuda a resolver incidencias, "
+            "buscar tickets similares y revisar el historial del cliente. Responde en español."
+        ),
+        "tool_ids": [
+            "platform.core.search",
+            "platform.core.list_indices",
+            "platform.core.get_document_by_id",
+        ],
+        "labels": ["crm", "elastic-crm", "support"],
+    },
+    {
+        "id": "crm_marketing_agent",
+        "name": "Marketing CRM",
+        "description": "Agente de Marketing: segmenta, analiza engagement en índices crm_*",
+        "instructions": (
+            "Eres un agente de marketing. Usa las herramientas para consultar "
+            "crm_customers, crm_campaigns y crm_interactions. Ayuda a segmentar clientes, "
+            "analizar engagement y resultados de campañas. Responde en español."
+        ),
+        "tool_ids": [
+            "platform.core.search",
+            "platform.core.list_indices",
+            "platform.core.get_document_by_id",
+        ],
+        "labels": ["crm", "elastic-crm", "marketing"],
+    },
+]
+
+
+async def ensure_crm_agents_in_kibana(
+    client: KibanaAgentBuilderClient,
+) -> list[str]:
+    """
+    Crea en Kibana los agentes CRM si no existen (igual que se crean los índices).
+    Retorna la lista de ids de agentes (ya existentes o recién creados).
+    """
+    for spec in CRM_AGENTS:
+        agent_id = spec["id"]
+        # Validar existencia usando get_agent del cliente
+        existing = await client.get_agent(agent_id)
+        if existing:
+            logger.debug(f"Agente ya existe en Kibana: {agent_id}")
+            continue
+
+        payload = build_crm_agent_payload(
+            agent_id=agent_id,
+            name=spec["name"],
+            description=spec["description"],
+            instructions=spec["instructions"],
+            tool_ids=spec.get("tool_ids"),
+            labels=spec.get("labels"),
+        )
+        await client.create_agent(payload)
+        logger.info(f"Agente creado en Kibana: {agent_id}")
+
+    return [s["id"] for s in CRM_AGENTS]
+
+
+async def create_and_register_crm_agents(
+    client: Optional[KibanaAgentBuilderClient] = None,
+) -> tuple[list["KibanaAgentWrapper"], KibanaAgentBuilderClient]:
+    """
+    Asegura que los agentes CRM existan en Kibana y retorna los wrappers
+    listos para registrar en el orquestador y el cliente (para cerrarlo en shutdown).
+    """
+    c = client or get_kibana_client()
+    if not c:
+        raise RuntimeError(
+            "Kibana no configurado. Define KIBANA_HOST y KIBANA_API_KEY en .env"
+        )
+    await ensure_crm_agents_in_kibana(c)
+    wrappers = [
+        KibanaAgentWrapper(
+            kibana_agent_id=spec["id"],
+            client=c,
+            name=spec["id"],
+            description=spec["description"],
+        )
+        for spec in CRM_AGENTS
+    ]
+    return wrappers, c
+
+
+class KibanaAgentWrapper(BaseAgent):
+    """
+    Wrapper que delega execute() en un agente de Elastic Agent Builder (Kibana)
+    mediante la API converse.
+
+    Útil para usar agentes creados/gestionados en Kibana desde el orquestador CRM.
+    """
+
+    def __init__(
+        self,
+        kibana_agent_id: str,
+        client: KibanaAgentBuilderClient,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ):
+        super().__init__(name=name or kibana_agent_id)
+        self._kibana_agent_id = kibana_agent_id
+        self._client = client
+        self._description = description or f"Agente Kibana: {kibana_agent_id}"
+
+    @property
+    def description(self) -> str:
+        return self._description
+
+    @property
+    def kibana_agent_id(self) -> str:
+        return self._kibana_agent_id
+
+    async def execute(self, input_data: dict) -> AgentResponse:
+        """
+        Envía el mensaje al agente en Kibana vía API converse.
+
+        input_data puede contener:
+          - "input" o "message": texto a enviar al agente
+          - "conversation_id": opcional, para continuar una conversación
+        """
+        self.state.status = AgentStatus.WORKING
+        self.state.last_updated = datetime.now()
+        try:
+            text = input_data.get("input") or input_data.get("message") or ""
+            if not text:
+                return AgentResponse(
+                    success=False,
+                    error="Falta 'input' o 'message' en input_data",
+                    agent_id=self.state.agent_id,
+                )
+            conversation_id = input_data.get("conversation_id")
+            response = await self._client.converse(
+                agent_id=self._kibana_agent_id,
+                input_text=text,
+                conversation_id=conversation_id,
+            )
+            return AgentResponse(
+                success=True,
+                data=response,
+                agent_id=self.state.agent_id,
+            )
+        except Exception as e:
+            logger.error(f"KibanaAgentWrapper execute error: {e}")
+            return AgentResponse(
+                success=False,
+                error=str(e),
+                agent_id=self.state.agent_id,
+            )
+        finally:
+            self.state.status = AgentStatus.IDLE
+
+
+def create_kibana_agent_wrapper(
+    kibana_agent_id: str,
+    client: Optional[KibanaAgentBuilderClient] = None,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Optional[KibanaAgentWrapper]:
+    """
+    Crea un wrapper que usa el agente de Kibana con el id dado.
+
+    Si no se pasa client, se usa get_kibana_client(). Si Kibana no está
+    configurado, retorna None.
+    """
+    c = client or get_kibana_client()
+    if not c:
+        logger.warning("Kibana no configurado (KIBANA_HOST + KIBANA_API_KEY). No se crea wrapper.")
+        return None
+    return KibanaAgentWrapper(
+        kibana_agent_id=kibana_agent_id,
+        client=c,
+        name=name,
+        description=description,
+    )
+
+
+def build_crm_agent_payload(
+    agent_id: str,
+    name: str,
+    description: str,
+    instructions: str,
+    tool_ids: Optional[list[str]] = None,
+    labels: Optional[list[str]] = None,
+) -> dict:
+    """
+    Construye el payload para crear/actualizar un agente en Kibana
+    orientado a CRM (búsqueda en índices crm_*).
+
+    tool_ids por defecto: platform.core.search y list_indices para explorar datos.
+    """
+    if tool_ids is None:
+        tool_ids = [
+            "platform.core.search",
+            "platform.core.list_indices",
+            "platform.core.get_document_by_id",
+        ]
+    return {
+        "id": agent_id,
+        "name": name,
+        "description": description,
+        "labels": labels or ["crm", "elastic-crm"],
+        "configuration": {
+            "instructions": instructions,
+            "tools": [{"tool_ids": tool_ids}],
+        },
+    }
 
 
 # Factory para crear agentes Elastic preconfigurados

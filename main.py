@@ -18,13 +18,12 @@ from elastic import (
     TicketRepository,
     InteractionRepository,
     CampaignRepository,
-    create_elastic_sales_agent,
-    create_elastic_support_agent,
-    create_elastic_marketing_agent,
+    create_and_register_crm_agents,
     Customer,
     Ticket,
     Interaction,
 )
+from elastic.kibana_agent_builder_client import KibanaAgentBuilderClient
 from utils.logger import setup_logger
 from config import config
 
@@ -37,7 +36,8 @@ class ElasticCRMApplication:
     def __init__(self):
         self.orchestrator: Optional[CRMOrchestrator] = None
         self._shutdown_event = asyncio.Event()
-        
+        self._kibana_client: Optional[KibanaAgentBuilderClient] = None
+
         # Repositorios Elastic
         self.customer_repo: Optional[CustomerRepository] = None
         self.ticket_repo: Optional[TicketRepository] = None
@@ -68,16 +68,15 @@ class ElasticCRMApplication:
         # Crear orquestador
         self.orchestrator = CRMOrchestrator()
 
-        # Crear y registrar agentes Elastic
-        agents = [
-            create_elastic_sales_agent(),
-            create_elastic_support_agent(),
-            create_elastic_marketing_agent(),
-        ]
-
-        for agent in agents:
-            await self.orchestrator.register_agent(agent)
-            logger.info(f"Agente Elastic registrado: {agent.name}")
+        # Crear agentes en Kibana (igual que los índices) y registrar wrappers
+        try:
+            agents, self._kibana_client = await create_and_register_crm_agents()
+            for agent in agents:
+                await self.orchestrator.register_agent(agent)
+                logger.info(f"Agente Kibana registrado: {agent.name}")
+        except RuntimeError as e:
+            logger.error(str(e))
+            raise
 
         logger.info("Elastic CRM Multi-Agente inicializado correctamente")
 
@@ -147,15 +146,15 @@ class ElasticCRMApplication:
         if juan_results:
             logger.info(f"Encontrado: {juan_results.name} (Lead Score: {juan_results.lead_score})")
 
-        # 3. Agente Elastic - Analizar cliente con contexto de Elastic
-        logger.info("\n3. Agente Elastic - Analizando cliente con RAG...")
-        sales_agent = self.orchestrator.get_agent("elastic_sales_agent")
+        # 3. Agente Kibana Ventas - Analizar cliente
+        logger.info("\n3. Agente Kibana Ventas - Analizando cliente...")
+        sales_agent = self.orchestrator.get_agent("crm_sales_agent")
         if sales_agent and juan_results:
             result = await sales_agent.execute({
-                "action": "analyze",
-                "customer_id": juan_results.customer_id,
-                "include_interactions": False,
-                "include_tickets": False,
+                "input": (
+                    f"Analiza el cliente con id {juan_results.customer_id} en crm_customers. "
+                    "Indica health score y recomendaciones basándote en los datos."
+                ),
             })
             logger.info(f"Análisis completado: {result.data}")
 
@@ -188,16 +187,17 @@ class ElasticCRMApplication:
         await self.interaction_repo.create(interaction)
         logger.info(f"Interacción registrada: {interaction.interaction_id}")
 
-        # 6. Agente Elastic - Búsqueda semántica
-        logger.info("\n6. Agente Elastic - Búsqueda semántica...")
-        support_agent = self.orchestrator.get_agent("elastic_support_agent")
+        # 6. Agente Kibana Soporte - Búsqueda
+        logger.info("\n6. Agente Kibana Soporte - Búsqueda...")
+        support_agent = self.orchestrator.get_agent("crm_support_agent")
         if support_agent:
             result = await support_agent.execute({
-                "action": "search",
-                "query": "cliente enterprise interesado pricing",
-                "top_k": 5,
+                "input": (
+                    "Busca en los índices crm_customers y crm_interactions "
+                    "clientes enterprise interesados en pricing. Resúmeme hasta 5 resultados."
+                ),
             })
-            logger.info(f"Búsqueda semántica: {result.data.get('total_found', 0)} resultados")
+            logger.info(f"Búsqueda: {result.data}")
 
         # 7. Agregaciones en Elasticsearch
         logger.info("\n7. Agregaciones en Elasticsearch...")
@@ -214,7 +214,7 @@ class ElasticCRMApplication:
         # 8. Mostrar estado del sistema
         logger.info("\n8. Estado del sistema:")
         status = self.orchestrator.get_status()
-        logger.info(f"Agentes Elastic registrados: {status['agents_count']}")
+        logger.info(f"Agentes Kibana registrados: {status['agents_count']}")
         
         customer_count = await self.customer_repo.count()
         ticket_count = await self.ticket_repo.count()
@@ -237,6 +237,8 @@ class ElasticCRMApplication:
         logger.info("Cerrando aplicación...")
         if self.orchestrator:
             await self.orchestrator.shutdown()
+        if self._kibana_client:
+            await self._kibana_client.close()
         await elastic_client.close()
         logger.info("Aplicación cerrada")
         self._shutdown_event.set()

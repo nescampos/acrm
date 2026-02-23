@@ -103,6 +103,11 @@ ELASTIC_USER=elastic
 ELASTIC_PASSWORD=tu_password
 ELASTIC_VERIFY_CERTS=false
 
+# Kibana - Elastic Agent Builder API
+KIBANA_HOST=http://localhost:5601
+KIBANA_API_KEY=your_kibana_api_key
+# KIBANA_SPACE=default
+
 # LLM Configuration (para Elastic Agent Builder)
 OPENAI_API_KEY=sk-...
 LLM_PROVIDER=openai
@@ -235,6 +240,73 @@ agent = ElasticAgentBuilder("mi_agente") \
     .with_description("Mi agente personalizado") \
     .build()
 ```
+
+### API de Kibana (Elastic Agent Builder)
+
+El proyecto integra la [API REST de Elastic Agent Builder en Kibana](https://www.elastic.co/docs/explore-analyze/ai-features/agent-builder/kibana-api) para gestionar agentes, tools y conversaciones de forma programática.
+
+**Configuración** (en `.env` o `config/config.yaml`):
+
+```env
+KIBANA_HOST=http://localhost:5601
+KIBANA_API_KEY=tu_api_key_de_kibana
+# KIBANA_SPACE=default   # opcional, para espacios no por defecto
+```
+
+**Cliente y gestión de agentes/tools:**
+
+```python
+from elastic import (
+    get_kibana_client,
+    KibanaAgentBuilderClient,
+    KibanaAgentWrapper,
+    create_kibana_agent_wrapper,
+    build_crm_agent_payload,
+)
+
+# Cliente (None si no hay KIBANA_HOST + KIBANA_API_KEY)
+client = get_kibana_client()
+if client:
+    # Listar agentes y tools
+    agents = await client.list_agents()
+    tools = await client.list_tools()
+
+    # Crear un agente CRM en Kibana
+    payload = build_crm_agent_payload(
+        agent_id="crm-sales-agent",
+        name="Ventas CRM",
+        description="Ayuda a buscar y analizar clientes en índices crm_*",
+        instructions="Eres un asistente de ventas. Usa las herramientas de búsqueda para consultar índices crm_customers, crm_tickets, crm_interactions.",
+    )
+    await client.create_agent(payload)
+
+    # Chat con el agente (converse)
+    response = await client.converse(
+        agent_id="crm-sales-agent",
+        input_text="¿Cuántos clientes hay en estado lead?",
+    )
+```
+
+**Wrapper para el orquestador:** usar un agente de Kibana como un agente más del CRM:
+
+```python
+from elastic import create_kibana_agent_wrapper
+from orchestrator import CRMOrchestrator
+
+wrapper = create_kibana_agent_wrapper(
+    kibana_agent_id="elastic-ai-agent",
+    name="kibana_elastic_agent",
+    description="Agente Elastic AI vía Kibana",
+)
+if wrapper:
+    orchestrator = CRMOrchestrator()
+    await orchestrator.register_agent(wrapper)
+    result = await wrapper.execute({
+        "input": "Busca en crm_customers los clientes con status prospect",
+    })
+```
+
+**Endpoints utilizados:** `GET/POST/PUT/DELETE` para tools y agents, `POST /api/agent_builder/converse` para chat, y listado/obtención/borrado de conversaciones.
 
 ## 📊 Modelos de Datos
 

@@ -44,7 +44,6 @@ class ElasticClient:
         """Obtiene cliente asíncrono."""
         if self._async_client is None:
             params = self._get_connection_params()
-            print(params)
             self._async_client = AsyncElasticsearch(**params)
             logger.info("Async Elasticsearch client created")
         return self._async_client
