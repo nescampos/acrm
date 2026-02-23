@@ -144,94 +144,9 @@ class ElasticCRMApplication:
         if juan_results:
             logger.info(f"Encontrado: {juan_results.name} (Lead Score: {juan_results.lead_score})")
 
-        # 6. Agente Kibana Ventas - Analizar cliente
-        logger.info("\n6. Agente Kibana Ventas - Analizando cliente...")
-        sales_agent = self.orchestrator.get_agent("crm_sales_agent")
-        if sales_agent and juan_results:
-            result = await sales_agent.execute({
-                "input": (
-                    f"Analiza el cliente con id {juan_results.customer_id} en crm_customers. "
-                    "Indica health score y recomendaciones basándote en los datos."
-                ),
-            })
-            logger.info(f"Análisis completado: {result.data}")
 
-        # 7. Agente Kibana Marketing - Analizar campañas
-        logger.info("\n7. Agente Kibana Marketing - Analizando campañas...")
-        marketing_agent = self.orchestrator.get_agent("crm_marketing_agent")
-        if marketing_agent:
-            result = await marketing_agent.execute({
-                "input": (
-                    "Analiza las campañas en crm_campaigns. ¿Cuál tiene mejor tasa de conversión? "
-                    "Recomienda optimizaciones para las campañas activas."
-                ),
-            })
-            logger.info(f"Análisis de marketing: {result.data}")
-
-        # 8. Agente Kibana Soporte - Búsqueda de tickets críticos
-        logger.info("\n8. Agente Kibana Soporte - Buscando tickets críticos...")
-        support_agent = self.orchestrator.get_agent("crm_support_agent")
-        if support_agent:
-            result = await support_agent.execute({
-                "input": (
-                    "Busca en crm_tickets los tickets con prioridad 'critical' o 'high'. "
-                    "Resume los problemas y sugiere soluciones basadas en el historial."
-                ),
-            })
-            logger.info(f"Análisis de soporte: {result.data}")
-
-        # 9. Agregaciones avanzadas en Elasticsearch
-        logger.info("\n9. Agregaciones avanzadas en Elasticsearch...")
-        agg_results = await self.customer_repo.aggregate({
-            "status_breakdown": {
-                "terms": {"field": "status"}
-            },
-            "avg_lead_score_by_status": {
-                "terms": {"field": "status"},
-                "aggs": {
-                    "avg_lead_score": {"avg": {"field": "lead_score"}},
-                    "avg_engagement": {"avg": {"field": "engagement_score"}}
-                }
-            },
-            "company_size_distribution": {
-                "range": {
-                    "field": "custom_fields.employees",
-                    "ranges": [
-                        {"key": "startup", "to": 50},
-                        {"key": "smb", "from": 51, "to": 500},
-                        {"key": "enterprise", "from": 501}
-                    ]
-                }
-            }
-        })
-        logger.info(f"Agregaciones de clientes: {agg_results}")
-
-        # 10. Análisis de rendimiento de campañas
-        logger.info("\n10. Análisis de rendimiento de campañas...")
-        campaign_agg = await self.campaign_repo.aggregate({
-            "status_breakdown": {
-                "terms": {"field": "status"}
-            },
-            "performance_metrics": {
-                "terms": {"field": "campaign_type"},
-                "aggs": {
-                    "avg_open_rate": {
-                        "avg": {"script": {
-                            "source": "doc['opened_count'].value / doc['sent_count'].value * 100"
-                        }}
-                    },
-                    "avg_conversion_rate": {
-                        "avg": {"script": {
-                            "source": "doc['converted_count'].value / doc['sent_count'].value * 100"
-                        }}
-                    }
-                }
-            }
-        })
-        logger.info(f"Métricas de campañas: {campaign_agg}")
-
-        # 11. Mostrar estado del sistema
-        logger.info("\n11. Estado del sistema:")
+        # 6. Mostrar estado del sistema
+        logger.info("\n6. Estado del sistema:")
         status = self.orchestrator.get_status()
         logger.info(f"Agentes Kibana registrados: {status['agents_count']}")
         
@@ -244,18 +159,6 @@ class ElasticCRMApplication:
         logger.info(f"Tickets en Elastic: {ticket_count}")
         logger.info(f"Interacciones en Elastic: {interaction_count}")
         logger.info(f"Campañas en Elastic: {campaign_count}")
-
-        # 12. Demo de búsqueda semántica
-        logger.info("\n12. Demo de búsqueda semántica...")
-        semantic_agent = self.orchestrator.get_agent("crm_sales_agent")
-        if semantic_agent:
-            result = await semantic_agent.execute({
-                "input": (
-                    "Busca clientes enterprise con alto engagement que podrían estar interesados "
-                    "en upgrading a planes premium. Incluye su historial de interacciones."
-                ),
-            })
-            logger.info(f"Búsqueda semántica: {result.data}")
 
         logger.info("\n=== Demostración Elastic CRM Completada ===")
 

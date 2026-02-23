@@ -124,20 +124,17 @@ cp .env.example .env    # Linux/Mac
 
 Edit `.env` with your configuration:
 ```env
-# Elastic Stack Configuration
-ELASTIC_HOST=http://localhost:9200
-ELASTIC_USER=elastic
-ELASTIC_PASSWORD=your_password
-ELASTIC_VERIFY_CERTS=false
+OPENAI_API_KEY=your_openai_api_key_here
 
-# Kibana - Elastic Agent Builder API
-KIBANA_HOST=http://localhost:5601
-KIBANA_API_KEY=your_kibana_api_key
-
-# LLM Configuration (for Elastic Agent Builder)
-OPENAI_API_KEY=sk-your-openai-key
-LLM_PROVIDER=openai
+# Model configuration
 LLM_MODEL=gpt-4o
+TEMPERATURE=0.7
+
+
+# Elastic Cloud Configuration
+ELASTIC_HOST=
+KIBANA_HOST=
+ELASTIC_CLOUD_API_KEY=
 ```
 
 
