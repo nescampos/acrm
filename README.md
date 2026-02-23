@@ -1,15 +1,17 @@
 # Elastic CRM - Multi-Agent System with Elastic Agent Builder
 
-Sistema multi-agente con orquestador para CRM agéntico, integrado con **Elasticsearch** y **Elastic Agent Builder**. Gestiona clientes, ventas, soporte y marketing mediante agentes especializados que utilizan búsqueda semántica y RAG sobre datos CRM almacenados en Elasticsearch.
+A sophisticated multi-agent CRM system integrated with **Elasticsearch** and **Elastic Agent Builder**. Manages customers, sales, support, and marketing through specialized agents leveraging semantic search and RAG capabilities on CRM data stored in Elasticsearch.
 
-## 🏗️ Arquitectura
+This platform use **OpenAI SDK** for routing between agents, verifying the user's intent and delegating the request to the appropriate agent.
+
+## 🏗️ Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CRM Orchestrator                             │
 │  ┌─────────────┬─────────────┬─────────────┬─────────────────┐ │
-│  │  Registro   │  Tareas     │  Clientes   │  Estado         │ │
-│  │  Agentes    │  Cola       │  (Elastic)  │  Global         │ │
+│  │  Agent      │  Task       │  Customer   │  Global         │ │
+│  │  Registry   │  Queue      │  (Elastic)  │  State          │ │
 │  └─────────────┴─────────────┴─────────────┴─────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
          │              │              │
@@ -35,215 +37,181 @@ Sistema multi-agente con orquestador para CRM agéntico, integrado con **Elastic
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## 📁 Estructura del Proyecto
+### Core Components
+
+#### 1. **CRM Orchestrator**
+- **Agent Registry**: Manages registration and discovery of all agents
+- **Task Queue**: Routes requests to appropriate agents based on OpenAI routing
+- **Customer Management**: Centralized customer data access via Elasticsearch
+- **Global State**: Maintains conversation context and agent states
+
+#### 2. **Elastic Agent Builder**
+- **Semantic Search**: Full-text search with fuzzy matching across all CRM indices
+- **RAG (Retrieval Augmented Generation)**: Context-aware responses using Elastic data
+- **Context Building**: Automatic context assembly for LLM queries
+- **Tools Integration**: Native integration with Elasticsearch tools
+
+#### 3. **Specialized Agents**
+- **Sales Agent**: Lead qualification, opportunity analysis, customer scoring
+- **Support Agent**: Ticket management, knowledge base search, issue resolution
+- **Marketing Agent**: Campaign analysis, customer segmentation, performance metrics
+
+## 📁 Project Structure
 
 ```
 Elastic/
-├── agents/                 # Agentes base y especializados
-│   ├── base.py            # Clase base abstracta
-│   ├── sales.py           # Agente de Ventas (standard)
-│   ├── support.py         # Agente de Soporte (standard)
-│   ├── marketing.py       # Agente de Marketing (standard)
-│   └── specialized.py     # Exportaciones
-├── elastic/               # Integración con Elastic Stack
-│   ├── __init__.py        # Módulo Elastic
-│   ├── client.py          # Cliente Elasticsearch
-│   ├── models.py          # Modelos de datos CRM
-│   ├── repository.py      # Repositorios CRUD
+├── agents/                 # Base and specialized agents
+│   ├── base.py            # Abstract base agent class
+│   ├── sales.py           # Sales agent (standard)
+│   ├── support.py         # Support agent (standard)
+│   ├── marketing.py       # Marketing agent (standard)
+│   └── specialized.py     # Export agents
+├── elastic/               # Elastic Stack integration
+│   ├── __init__.py        # Elastic module
+│   ├── client.py          # Elasticsearch client
+│   ├── models.py          # CRM data models
+│   ├── repository.py      # CRUD repositories
 │   └── agent_builder.py   # Elastic Agent Builder
-├── orchestrator/          # Orquestador CRM
-│   └── orchestrator.py    # CRMOrchestrator
-├── config/                # Configuración
+├── orchestrator/          # CRM Orchestrator
+│   └── orchestrator.py    # CRMOrchestrator class
+├── config/                # Configuration
 │   ├── __init__.py        # Config manager
-│   └── config.yaml        # YAML config
-├── tools/                 # Herramientas para agentes
-│   └── tools.py           # BaseTool
-├── utils/                 # Utilidades
+│   └── config.yaml        # YAML configuration
+├── tools/                 # Agent tools
+│   └── tools.py           # BaseTool class
+├── utils/                 # Utilities
 │   └── logger.py          # Logging setup
-├── main.py                # Punto de entrada
-├── requirements.txt       # Dependencias
-├── pyproject.toml         # Metadatos del proyecto
-├── .env.example           # Variables de entorno ejemplo
-└── README.md              # Documentación
+├── webapp/                # Web interface
+│   └── server.py          # FastAPI web server
+├── demo_data.py           # Demo data for testing
+├── main.py                # Entry point
+├── requirements.txt       # Dependencies
+├── pyproject.toml         # Project metadata
+├── .env.example           # Environment variables example
+└── README.md              # Documentation
 ```
 
-## 🚀 Instalación
+## 🚀 Installation
 
-### 1. Requisitos previos
-
+### Prerequisites
 - Python 3.10+
-- Elasticsearch 8.x (local o Elastic Cloud)
+- Elasticsearch 8.x (local or Elastic Cloud)
+- OpenAI API key (for routing)
 
-### 2. Activar entorno virtual:
+### 1. Setup Virtual Environment
 ```bash
-# Windows
+# Create virtual environment
+python -m venv .venv
+
+# Activate (Windows)
 .venv\Scripts\activate
 
-# Linux/Mac
+# Activate (Linux/Mac)
 source .venv/bin/activate
 ```
 
-### 3. Instalar dependencias:
+### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configurar variables de entorno:
+### 3. Configure Environment
 ```bash
-# Copiar archivo de ejemplo
+# Copy environment template
 copy .env.example .env  # Windows
 cp .env.example .env    # Linux/Mac
 ```
 
-Editar `.env` con tu configuración de Elastic:
+Edit `.env` with your configuration:
 ```env
 # Elastic Stack Configuration
 ELASTIC_HOST=http://localhost:9200
 ELASTIC_USER=elastic
-ELASTIC_PASSWORD=tu_password
+ELASTIC_PASSWORD=your_password
 ELASTIC_VERIFY_CERTS=false
 
 # Kibana - Elastic Agent Builder API
 KIBANA_HOST=http://localhost:5601
 KIBANA_API_KEY=your_kibana_api_key
-# KIBANA_SPACE=default
 
-# LLM Configuration (para Elastic Agent Builder)
-OPENAI_API_KEY=sk-...
+# LLM Configuration (for Elastic Agent Builder)
+OPENAI_API_KEY=sk-your-openai-key
 LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o
 ```
 
-## 💡 Uso Básico
 
-### Ejecutar demostración:
-```bash
-python main.py
-```
+## 💻 Usage Modes
 
-### Modo Web (FastAPI)
-
-1) Instalar dependencias:
+### 1. Demo Mode
+Runs a comprehensive demonstration with sample data:
 
 ```bash
-pip install -r requirements.txt
+python main.py --demo
 ```
 
-2) Ejecutar servidor:
+**Demo Features:**
+- Creates 8 sample customers with diverse profiles
+- Generates 6 support tickets with various priorities
+- Adds 8 customer interactions (email, calls, meetings)
+- Creates 5 marketing campaigns with performance metrics
+- Demonstrates all agent capabilities
+- Shows advanced Elasticsearch aggregations
+- Semantic search examples
+
+### 2. Interactive Chat Mode
+Command-line interface with intelligent agent routing:
+
+```bash
+python main.py --chat
+```
+
+**Chat Features:**
+- OpenAI-powered agent routing
+- Conversation persistence per agent
+- Real-time agent responses
+- Commands:
+  - `/agents` - List available agents
+  - `/exit` - Exit chat
+
+**Example Chat Session:**
+```
+crm> Show me enterprise customers with high engagement
+[crm_sales_agent] Found 3 enterprise customers with engagement scores above 80:
+1. Carlos López (CloudInc) - Score: 85, Status: Customer
+2. Sofia Castro (HealthTech Solutions) - Score: 95, Status: Champion
+3. Roberto Silva (Enterprise Solutions) - Score: 70, Status: Prospect
+
+crm> What marketing campaigns are currently active?
+[crm_marketing_agent] Currently active campaigns:
+1. "Q1 Email Campaign - Enterprise Leads" - 38.8% open rate
+2. "Webinar Series - Cloud Solutions" - 39.3% open rate
+```
+
+### 3. Web Interface
+Modern web UI with markdown rendering:
 
 ```bash
 uvicorn webapp.server:app --reload --port 8000
 ```
 
-3) Abrir en el navegador: `http://localhost:8000`
+**Web Features:**
+- Real-time chat interface
+- Markdown-formatted responses
+- Agent routing visualization
+- Session management
+- Responsive dark theme
+- HTML rendering of tables, lists, and formatted text
 
-La web reutiliza el mismo flujo que consola: el usuario escribe un mensaje, el **orquestador rutea con OpenAI** y delega al **agente de Kibana** correspondiente.
+**Access:** `http://localhost:8000`
 
-### Uso programático:
-```python
-import asyncio
-from elastic import (
-    elastic_client,
-    CustomerRepository,
-    Customer,
-    create_elastic_sales_agent,
-)
-from orchestrator import CRMOrchestrator
+## 🤖 Elastic Agent Builder Integration
 
-async def main():
-    # Conectar a Elasticsearch
-    await elastic_client.ping()
-    
-    # Crear repositorio
-    customer_repo = CustomerRepository()
-    await customer_repo.initialize()
-    
-    # Agregar cliente
-    customer = Customer(
-        name="Juan Pérez",
-        email="juan@example.com",
-        company="TechCorp",
-        status="lead",
-        lead_score=75,
-    )
-    await customer_repo.create(customer)
-    
-    # Búsqueda en Elastic
-    results = await customer_repo.find_by_email("juan@example.com")
-    print(f"Encontrado: {results.name}")
-    
-    # Crear agente Elastic
-    orchestrator = CRMOrchestrator()
-    agent = create_elastic_sales_agent()
-    await orchestrator.register_agent(agent)
-    
-    # Analizar cliente con RAG
-    result = await agent.execute({
-        "action": "analyze",
-        "customer_id": customer.customer_id,
-    })
-    print(f"Análisis: {result.data}")
-    
-    # Limpiar
-    await orchestrator.shutdown()
-    await elastic_client.close()
 
-asyncio.run(main())
-```
-
-## 🤖 Elastic Agent Builder
-
-El **Elastic Agent Builder** permite crear agentes que utilizan Elasticsearch para:
-
-### Características
-
-| Característica | Descripción |
-|---------------|-------------|
-| **Semantic Search** | Búsqueda full-text con fuzzy matching en todos los índices CRM |
-| **RAG** | Retrieval Augmented Generation con contexto de Elastic |
-| **Aggregations** | Análisis de datos con agregaciones de Elasticsearch |
-| **Context Building** | Construcción automática de contexto para LLMs |
-
-### Acciones disponibles:
-
-```python
-# Búsqueda semántica
-result = await agent.execute({
-    "action": "search",
-    "query": "cliente enterprise interesado",
-    "index": "customers",
-    "top_k": 5,
-})
-
-# Análisis de cliente con contexto
-result = await agent.execute({
-    "action": "analyze",
-    "customer_id": "customer-123",
-    "include_interactions": True,
-    "include_tickets": True,
-})
-
-# Agregaciones
-result = await agent.execute({
-    "action": "aggregate",
-    "index": "customers",
-    "aggregation_type": "terms",
-    "field": "status",
-})
-
-# Recuperar contexto para RAG
-result = await agent.execute({
-    "action": "retrieve_context",
-    "query": "historial de compras del cliente",
-    "context_types": ["customers", "interactions", "tickets"],
-})
-```
-
-### Crear agentes personalizados:
+### Custom Agent Creation
 
 ```python
 from elastic import ElasticAgentBuilder, ElasticAgentConfig
-from elastic import CustomerRepository, TicketRepository
 
 config = ElasticAgentConfig(
     enable_semantic_search=True,
@@ -251,127 +219,63 @@ config = ElasticAgentConfig(
     top_k_results=10,
 )
 
-agent = ElasticAgentBuilder("mi_agente") \
+agent = ElasticAgentBuilder("custom_agent") \
     .with_config(config) \
     .with_repository("customers", CustomerRepository()) \
     .with_repository("tickets", TicketRepository()) \
-    .with_description("Mi agente personalizado") \
+    .with_description("Custom agent for specific tasks") \
     .build()
 ```
 
-### API de Kibana (Elastic Agent Builder)
+## 📊 Data Models
 
-El proyecto integra la [API REST de Elastic Agent Builder en Kibana](https://www.elastic.co/docs/explore-analyze/ai-features/agent-builder/kibana-api) para gestionar agentes, tools y conversaciones de forma programática.
-
-**Configuración** (en `.env` o `config/config.yaml`):
-
-```env
-KIBANA_HOST=http://localhost:5601
-KIBANA_API_KEY=tu_api_key_de_kibana
-# KIBANA_SPACE=default   # opcional, para espacios no por defecto
-```
-
-**Cliente y gestión de agentes/tools:**
-
-```python
-from elastic import (
-    get_kibana_client,
-    KibanaAgentBuilderClient,
-    KibanaAgentWrapper,
-    create_kibana_agent_wrapper,
-    build_crm_agent_payload,
-)
-
-# Cliente (None si no hay KIBANA_HOST + KIBANA_API_KEY)
-client = get_kibana_client()
-if client:
-    # Listar agentes y tools
-    agents = await client.list_agents()
-    tools = await client.list_tools()
-
-    # Crear un agente CRM en Kibana
-    payload = build_crm_agent_payload(
-        agent_id="crm-sales-agent",
-        name="Ventas CRM",
-        description="Ayuda a buscar y analizar clientes en índices crm_*",
-        instructions="Eres un asistente de ventas. Usa las herramientas de búsqueda para consultar índices crm_customers, crm_tickets, crm_interactions.",
-    )
-    await client.create_agent(payload)
-
-    # Chat con el agente (converse)
-    response = await client.converse(
-        agent_id="crm-sales-agent",
-        input_text="¿Cuántos clientes hay en estado lead?",
-    )
-```
-
-**Wrapper para el orquestador:** usar un agente de Kibana como un agente más del CRM:
-
-```python
-from elastic import create_kibana_agent_wrapper
-from orchestrator import CRMOrchestrator
-
-wrapper = create_kibana_agent_wrapper(
-    kibana_agent_id="elastic-ai-agent",
-    name="kibana_elastic_agent",
-    description="Agente Elastic AI vía Kibana",
-)
-if wrapper:
-    orchestrator = CRMOrchestrator()
-    await orchestrator.register_agent(wrapper)
-    result = await wrapper.execute({
-        "input": "Busca en crm_customers los clientes con status prospect",
-    })
-```
-
-**Endpoints utilizados:** `GET/POST/PUT/DELETE` para tools y agents, `POST /api/agent_builder/converse` para chat, y listado/obtención/borrado de conversaciones.
-
-## 📊 Modelos de Datos
-
-### Customer (crm_customers)
+### Customer Model
 ```python
 Customer(
     customer_id="uuid",
-    name="Juan Pérez",
-    email="juan@example.com",
+    name="John Doe",
+    email="john@example.com",
     company="TechCorp",
     status="lead",  # lead, prospect, customer, inactive, champion
     lead_score=75,
     engagement_score=60,
-    lifetime_value=0.0,
+    lifetime_value=15000.0,
     tags=["enterprise", "hot_lead"],
+    custom_fields={"industry": "Software", "employees": 500},
+    created_at=datetime.now(),
+    last_contacted_at=datetime.now(),
 )
 ```
 
-### Ticket (crm_tickets)
+### Ticket Model
 ```python
 Ticket(
     ticket_id="uuid",
     customer_id="customer-uuid",
-    subject="Problema con login",
-    description="...",
+    subject="Login issue",
+    description="Cannot access account",
     status="open",  # open, in_progress, pending, resolved, closed
-    priority="medium",  # low, medium, high, critical
+    priority="high",  # low, medium, high, critical
     category="access_management",
     channel="email",
 )
 ```
 
-### Interaction (crm_interactions)
+### Interaction Model
 ```python
 Interaction(
     interaction_id="uuid",
     customer_id="customer-uuid",
     interaction_type="email",  # email, call, meeting, chat, social
     direction="inbound",  # inbound, outbound
-    subject="Re: Consulta",
-    content="...",
+    subject="Product inquiry",
+    content="Customer interested in enterprise features",
     outcome="interested",
     next_action="schedule_demo",
 )
 ```
 
-### Campaign (crm_campaigns)
+### Campaign Model
 ```python
 Campaign(
     campaign_id="uuid",
@@ -379,62 +283,15 @@ Campaign(
     campaign_type="email",
     status="active",  # draft, active, paused, completed
     target_segment="enterprise",
-    sent_count=100,
-    opened_count=45,
-    clicked_count=12,
+    sent_count=1000,
+    opened_count=388,
+    clicked_count=97,
+    converted_count=15,
 )
 ```
 
-## 🔍 Búsquedas en Elasticsearch
 
-### Repositorio de Clientes:
-```python
-repo = CustomerRepository()
-
-# Búsqueda por email
-customer = await repo.find_by_email("juan@example.com")
-
-# Búsqueda por estado
-leads = await repo.find_by_status("lead")
-
-# Búsqueda fuzzy por nombre
-results = await repo.search_by_name("Juan Peres")
-
-# Búsqueda custom
-results = await repo.search({
-    "bool": {
-        "must": [{"match": {"company": "TechCorp"}}],
-        "filter": [{"range": {"lead_score": {"gte": 50}}}]
-    }
-})
-```
-
-### Repositorio de Tickets:
-```python
-repo = TicketRepository()
-
-# Tickets de un cliente
-tickets = await repo.find_by_customer("customer-uuid")
-
-# Tickets abiertos
-open_tickets = await repo.find_open_tickets()
-
-# Tickets con SLA vencido
-overdue = await repo.find_overdue_tickets()
-```
-
-### Repositorio de Interacciones:
-```python
-repo = InteractionRepository()
-
-# Historial de un cliente
-history = await repo.find_by_customer("customer-uuid")
-
-# Interacciones recientes (últimos 7 días)
-recent = await repo.find_recent("customer-uuid", days=7)
-```
-
-## ⚙️ Configuración
+## ⚙️ Configuration
 
 ### config/config.yaml
 ```yaml
@@ -450,88 +307,104 @@ elastic:
     interactions: crm_interactions
     campaigns: crm_campaigns
 
-# LLM para Elastic Agent Builder
+# LLM Configuration
 llm:
   provider: openai
   model: gpt-4o
   temperature: 0.7
 
-# Agentes
+# Agent Configuration
 agents:
   sales:
-    type: elastic  # elastic o standard
+    type: elastic  # elastic or standard
     semantic_search: true
     rag_enabled: true
+  support:
+    type: elastic
+    semantic_search: true
+    rag_enabled: true
+  marketing:
+    type: elastic
+    semantic_search: true
+    rag_enabled: true
+
+# Logging
+log_level: INFO
 ```
 
-### Elastic Cloud (alternativa):
+### Elastic Cloud Configuration
 ```env
 ELASTIC_CLOUD_ID=your_cloud_id:region
 ELASTIC_CLOUD_API_KEY=your_api_key
 ```
 
-## 📈 Casos de Uso
+## 📈 Use Cases
 
-### 1. Ventas - Calificación de Leads con contexto
+### 1. Sales - Lead Qualification
 ```python
+# Analyze lead with full context
 agent = create_elastic_sales_agent()
 result = await agent.execute({
-    "action": "analyze",
-    "customer_id": customer_id,
+    "input": "Analyze lead John Doe from TechCorp. Provide health score and recommendations."
 })
-# Retorna: health_score, recommendations, historial completo
+# Returns: health_score, recommendations, complete history
 ```
 
-### 2. Soporte - Búsqueda de tickets similares
+### 2. Support - Ticket Resolution
 ```python
+# Find similar tickets for quick resolution
 agent = create_elastic_support_agent()
 result = await agent.execute({
-    "action": "search",
-    "query": "problema login contraseña incorrecta",
-    "index": "tickets",
+    "input": "Find tickets similar to 'login password issue'. Suggest solutions."
 })
-# Retorna: tickets similares para resolución rápida
+# Returns: similar tickets, resolution patterns, suggested actions
 ```
 
-### 3. Marketing - Segmentación con agregaciones
+### 3. Marketing - Campaign Analysis
 ```python
-repo = CustomerRepository()
-segments = await repo.aggregate({
-    "status_breakdown": {
-        "terms": {"field": "status"}
-    },
-    "avg_engagement_by_status": {
-        "terms": {"field": "status"},
-        "aggs": {
-            "avg_engagement": {"avg": {"field": "engagement_score"}}
-        }
-    }
+# Analyze campaign performance
+agent = create_elastic_marketing_agent()
+result = await agent.execute({
+    "input": "Analyze Q1 campaign performance. Which segments responded best?"
 })
+# Returns: performance metrics, segment analysis, optimization suggestions
 ```
 
-## 🧪 Desarrollo
-
-### Instalar en modo desarrollo:
-```bash
-pip install -e ".[dev]"
+### 4. Customer 360 View
+```python
+# Complete customer profile
+agent = create_elastic_sales_agent()
+result = await agent.execute({
+    "input": "Provide complete 360° view for customer Carlos López including all interactions, tickets, and campaign engagement."
+})
+# Returns: comprehensive profile with all related data
 ```
 
-### Ejecutar tests:
-```bash
-pytest tests/
+
+## 🔧 API Reference
+
+### REST API Endpoints
+
+#### Chat Interface
+```http
+POST /api/chat
+Content-Type: application/json
+
+{
+  "message": "Show me enterprise customers with high engagement"
+}
+
+Response:
+{
+  "ok": true,
+  "agent": "crm_sales_agent",
+  "text": "Found 3 enterprise customers...",
+  "html": "<h3>Enterprise Customers</h3><ul>...",
+  "reasoning": "User is asking about enterprise customers..."
+}
 ```
 
-### Docker para Elasticsearch local:
-```bash
-docker run -d \
-  --name elasticsearch \
-  -p 9200:9200 \
-  -p 9300:9300 \
-  -e "discovery.type=single-node" \
-  -e "xpack.security.enabled=false" \
-  elasticsearch:8.11.0
-```
 
-## 📝 Licencia
+## 📝 License
 
-MIT License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

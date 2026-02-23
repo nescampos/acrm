@@ -9,6 +9,7 @@ from typing import Any, Optional
 from fastapi import Cookie, FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
+from markdownify import markdownify as md
 
 from main import ElasticCRMApplication
 
@@ -48,6 +49,44 @@ def _extract_text(payload: Any) -> str:
     
     # Si no hay mensaje, retornar el payload completo
     return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+def _markdown_to_html(text: str) -> str:
+    """
+    Convierte texto markdown a HTML para mostrar en la web.
+    """
+    if not text:
+        return ""
+    
+    # Preprocesar el texto para asegurar formato correcto
+    # Convertir dobles saltos de línea a <br> para preservar párrafos
+    text = text.replace('\n\n', '<br><br>')
+    
+    # Convertir markdown a HTML
+    html = md(text, 
+              heading_style="ATX",
+              bullets="*",
+              strong_em_symbol="*",
+              em_symbol="*",
+              convert=['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
+                      'strong', 'em', 'u', 's', 'code', 'pre',
+                      'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 
+                      'tbody', 'tr', 'th', 'td', 'hr', 'br'])
+    
+    # Limpiar y mejorar el HTML con estilos
+    html = html.replace("<table>", '<table style="border-collapse: collapse; width: 100%; margin: 8px 0;">')
+    html = html.replace("<th>", '<th style="border: 1px solid #223255; padding: 8px; text-align: left; background: #1b2a4d;">')
+    html = html.replace("<td>", '<td style="border: 1px solid #223255; padding: 8px;">')
+    html = html.replace("<ul>", '<ul style="margin: 8px 0; padding-left: 20px;">')
+    html = html.replace("<ol>", '<ol style="margin: 8px 0; padding-left: 20px;">')
+    html = html.replace("<li>", '<li style="margin: 4px 0;">')
+    html = html.replace("<blockquote>", '<blockquote style="border-left: 3px solid #2a3c64; padding-left: 12px; margin: 8px 0; color: #9fb2d0;">')
+    html = html.replace("<code>", '<code style="background: #1b2a4d; padding: 2px 6px; border-radius: 4px; font-family: monospace;">')
+    html = html.replace("<pre>", '<pre style="background: #1b2a4d; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0;">')
+    html = html.replace("<hr>", '<hr style="border: 1px solid #223255; margin: 16px 0;">')
+    html = html.replace("<p>", '<p style="margin: 8px 0;">')
+    
+    return html
 
 
 @asynccontextmanager
@@ -124,10 +163,16 @@ async def index():
       const send = document.getElementById('send');
       const status = document.getElementById('status');
 
-      function addMsg(who, meta, text) {
+      function addMsg(who, meta, content, isHtml = false) {
         const div = document.createElement('div');
         div.className = 'msg ' + (who === 'me' ? 'me' : 'bot');
-        div.innerHTML = `<div class="meta">${meta}</div><div style="white-space: pre-wrap">${text}</div>`;
+        
+        if (isHtml) {
+          div.innerHTML = `<div class="meta">${meta}</div><div>${content}</div>`;
+        } else {
+          div.innerHTML = `<div class="meta">${meta}</div><div style="white-space: pre-wrap">${content}</div>`;
+        }
+        
         log.appendChild(div);
         log.scrollTop = log.scrollHeight;
       }
@@ -157,7 +202,8 @@ async def index():
           }
           const data = await postChat(message);
           if (data.ok) {
-            addMsg('bot', `Agente: ${data.agent}`, data.text);
+            console.log('Debug info:', data.debug);
+            addMsg('bot', `Agente: ${data.agent}`, data.html || data.text, true);
           } else {
             addMsg('bot', 'Error', data.error || 'Error desconocido');
           }
@@ -239,6 +285,12 @@ async def api_chat(
                 "agent": agent_name,
                 "reasoning": route.reasoning,
                 "text": _extract_text(result.data),
+                "html": _markdown_to_html(_extract_text(result.data)),
+                "debug": {
+                    "raw_text": _extract_text(result.data),
+                    "text_length": len(_extract_text(result.data)),
+                    "html_length": len(_markdown_to_html(_extract_text(result.data)))
+                },
                 "raw": result.data,
             }
         )

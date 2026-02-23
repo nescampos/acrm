@@ -16,6 +16,7 @@ openai==2.21.0
 # Web app
 fastapi
 uvicorn[standard]
+markdownify>=0.13.1
 
 # Elastic Stack
 elasticsearch>=8.0.0
