@@ -19,10 +19,34 @@ class ChatRequest:
 
 
 def _extract_text(payload: Any) -> str:
-    if isinstance(payload, dict) and isinstance(payload.get("message"), str):
-        return payload["message"]
-    if isinstance(payload, str):
-        return payload
+    """
+    Extrae el mensaje de la respuesta del agente de Kibana.
+    
+    La respuesta de Kibana tiene el formato:
+    {
+        "response": {
+            "message": "contenido del mensaje"
+        },
+        ...
+    }
+    """
+    if not isinstance(payload, dict):
+        if isinstance(payload, str):
+            return payload
+        return json.dumps(payload, ensure_ascii=False, indent=2)
+    
+    # Buscar el mensaje en response.message (formato de Kibana)
+    if "response" in payload and isinstance(payload["response"], dict):
+        message = payload["response"].get("message")
+        if isinstance(message, str):
+            return message
+    
+    # Fallback: buscar message directo
+    message = payload.get("message")
+    if isinstance(message, str):
+        return message
+    
+    # Si no hay mensaje, retornar el payload completo
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
