@@ -35,13 +35,8 @@ class ElasticClient:
     def _get_connection_params(self) -> dict:
         """Obtiene parámetros de conexión desde configuración."""
         return {
-            "hosts": [config.get("ELASTIC_HOST", "http://localhost:9200")],
-            "basic_auth": (
-                config.get("ELASTIC_USER", "elastic"),
-                config.get("ELASTIC_PASSWORD", "changeme"),
-            ),
-            "verify_certs": config.get_bool("ELASTIC_VERIFY_CERTS", False),
-            "request_timeout": config.get_int("ELASTIC_TIMEOUT", 30),
+             "hosts":[config.get("ELASTIC_HOST")],
+             "api_key":config.get("ELASTIC_CLOUD_API_KEY"),
         }
 
     @property
@@ -49,6 +44,7 @@ class ElasticClient:
         """Obtiene cliente asíncrono."""
         if self._async_client is None:
             params = self._get_connection_params()
+            print(params)
             self._async_client = AsyncElasticsearch(**params)
             logger.info("Async Elasticsearch client created")
         return self._async_client

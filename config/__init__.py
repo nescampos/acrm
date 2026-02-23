@@ -144,6 +144,11 @@ class Config:
         """Timeout para conexiones a Elastic."""
         return self.get_int("ELASTIC_TIMEOUT", 30)
 
+    @property
+    def elastic_cloud_api_key(self) -> str:
+        """API Key de Elasticsearch Cloud."""
+        return self.get("ELASTIC_CLOUD_API_KEY")
+
 
 # Instancia global
 config = Config()
