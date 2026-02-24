@@ -56,41 +56,6 @@ This platform use **OpenAI SDK** for routing between agents, verifying the user'
 - **Support Agent**: Ticket management, knowledge base search, issue resolution
 - **Marketing Agent**: Campaign analysis, customer segmentation, performance metrics
 
-## 📁 Project Structure
-
-```
-root/
-├── agents/                 # Base and specialized agents
-│   ├── base.py            # Abstract base agent class
-│   ├── sales.py           # Sales agent (standard)
-│   ├── support.py         # Support agent (standard)
-│   ├── marketing.py       # Marketing agent (standard)
-│   └── specialized.py     # Export agents
-├── elastic/               # Elastic Stack integration
-│   ├── __init__.py        # Elastic module
-│   ├── client.py          # Elasticsearch client
-│   ├── models.py          # CRM data models
-│   ├── repository.py      # CRUD repositories
-│   └── agent_builder.py   # Elastic Agent Builder
-├── orchestrator/          # CRM Orchestrator
-│   └── orchestrator.py    # CRMOrchestrator class
-├── config/                # Configuration
-│   ├── __init__.py        # Config manager
-│   └── config.yaml        # YAML configuration
-├── tools/                 # Agent tools
-│   └── tools.py           # BaseTool class
-├── utils/                 # Utilities
-│   └── logger.py          # Logging setup
-├── webapp/                # Web interface
-│   └── server.py          # FastAPI web server
-├── demo_data.py           # Demo data for testing
-├── main.py                # Entry point
-├── requirements.txt       # Dependencies
-├── pyproject.toml         # Project metadata
-├── .env.example           # Environment variables example
-└── README.md              # Documentation
-```
-
 ## 🚀 Installation
 
 ### Prerequisites
