@@ -431,12 +431,12 @@ def get_kibana_client() -> Optional[KibanaAgentBuilderClient]:
 CRM_AGENTS = [
     {
         "id": "crm_sales_agent",
-        "name": "Ventas CRM",
-        "description": "Agente de Ventas: califica leads, analiza oportunidades en índices crm_*",
+        "name": "Sales Agent",
+        "description": "Sales Agent: Qualifies leads, analyzes opportunities in crm_* indexes",
         "instructions": (
-            "Eres un agente de ventas. Usa las herramientas de búsqueda para consultar "
-            "los índices crm_customers y crm_interactions. Ayuda a calificar leads, "
-            "analizar oportunidades y recomendar siguientes pasos. Responde en español."
+            "You are a sales agent. Use the tools to consult "
+            "crm_customers and crm_interactions. Help qualify leads, "
+            "analyze opportunities and recommend next steps. Respond in english."
         ),
         "tool_ids": [
             "platform.core.search",
@@ -447,12 +447,12 @@ CRM_AGENTS = [
     },
     {
         "id": "crm_support_agent",
-        "name": "Soporte CRM",
-        "description": "Agente de Soporte: gestiona tickets, analiza historial en índices crm_*",
+        "name": "Support Agent",
+        "description": "Support Agent: manages tickets, analyzes history in crm_* indexes",
         "instructions": (
-            "Eres un agente de soporte. Usa las herramientas para consultar "
-            "crm_tickets, crm_customers y crm_interactions. Ayuda a resolver incidencias, "
-            "buscar tickets similares y revisar el historial del cliente. Responde en español."
+            "You are a support agent. Use the tools to consult "
+            "crm_tickets, crm_customers and crm_interactions. Help resolve incidents, "
+            "search similar tickets and review the customer history. Respond in english."
         ),
         "tool_ids": [
             "platform.core.search",
@@ -463,12 +463,12 @@ CRM_AGENTS = [
     },
     {
         "id": "crm_marketing_agent",
-        "name": "Marketing CRM",
-        "description": "Agente de Marketing: segmenta, analiza engagement en índices crm_*",
+        "name": "Marketing Agent",
+        "description": "Marketing Agent: segments, analyzes engagement in crm_* indexes",
         "instructions": (
-            "Eres un agente de marketing. Usa las herramientas para consultar "
-            "crm_customers, crm_campaigns y crm_interactions. Ayuda a segmentar clientes, "
-            "analizar engagement y resultados de campañas. Responde en español."
+            "You are a marketing agent. Use the tools to consult "
+            "crm_customers, crm_campaigns and crm_interactions. Help segment clients, "
+            "analyze engagement and campaign results. Respond in english."
         ),
         "tool_ids": [
             "platform.core.search",
@@ -504,7 +504,7 @@ async def ensure_crm_agents_in_kibana(
             labels=spec.get("labels"),
         )
         await client.create_agent(payload)
-        logger.info(f"Agente creado en Kibana: {agent_id}")
+        logger.info(f"Agente created in Kibana: {agent_id}")
 
     return [s["id"] for s in CRM_AGENTS]
 
@@ -519,7 +519,7 @@ async def create_and_register_crm_agents(
     c = client or get_kibana_client()
     if not c:
         raise RuntimeError(
-            "Kibana no configurado. Define KIBANA_HOST y KIBANA_API_KEY en .env"
+            "Kibana not configured. Define KIBANA_HOST and KIBANA_API_KEY in .env"
         )
     await ensure_crm_agents_in_kibana(c)
     wrappers = [
@@ -616,7 +616,7 @@ def create_kibana_agent_wrapper(
     """
     c = client or get_kibana_client()
     if not c:
-        logger.warning("Kibana no configurado (KIBANA_HOST + KIBANA_API_KEY). No se crea wrapper.")
+        logger.warning("Kibana not configured (KIBANA_HOST + KIBANA_API_KEY). No wrapper created.")
         return None
     return KibanaAgentWrapper(
         kibana_agent_id=kibana_agent_id,

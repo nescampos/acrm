@@ -95,8 +95,8 @@ Elastic/
 
 ### Prerequisites
 - Python 3.10+
-- Elasticsearch 8.x (local or Elastic Cloud)
-- OpenAI API key (for routing)
+- Elastic Cloud (serverless project)
+- OpenAI API key (for routing requests to agents)
 
 ### 1. Setup Virtual Environment
 ```bash
@@ -290,45 +290,6 @@ Campaign(
 
 ## ⚙️ Configuration
 
-### config/config.yaml
-```yaml
-# Elastic Stack
-elastic:
-  host: http://localhost:9200
-  user: elastic
-  password: changeme
-  verify_certs: false
-  indices:
-    customers: crm_customers
-    tickets: crm_tickets
-    interactions: crm_interactions
-    campaigns: crm_campaigns
-
-# LLM Configuration
-llm:
-  provider: openai
-  model: gpt-4o
-  temperature: 0.7
-
-# Agent Configuration
-agents:
-  sales:
-    type: elastic  # elastic or standard
-    semantic_search: true
-    rag_enabled: true
-  support:
-    type: elastic
-    semantic_search: true
-    rag_enabled: true
-  marketing:
-    type: elastic
-    semantic_search: true
-    rag_enabled: true
-
-# Logging
-log_level: INFO
-```
-
 ### Elastic Cloud Configuration
 ```env
 ELASTIC_CLOUD_ID=your_cloud_id:region
@@ -336,46 +297,10 @@ ELASTIC_CLOUD_API_KEY=your_api_key
 ```
 
 ## 📈 Use Cases
-
-### 1. Sales - Lead Qualification
-```python
-# Analyze lead with full context
-agent = create_elastic_sales_agent()
-result = await agent.execute({
-    "input": "Analyze lead John Doe from TechCorp. Provide health score and recommendations."
-})
-# Returns: health_score, recommendations, complete history
-```
-
-### 2. Support - Ticket Resolution
-```python
-# Find similar tickets for quick resolution
-agent = create_elastic_support_agent()
-result = await agent.execute({
-    "input": "Find tickets similar to 'login password issue'. Suggest solutions."
-})
-# Returns: similar tickets, resolution patterns, suggested actions
-```
-
-### 3. Marketing - Campaign Analysis
-```python
-# Analyze campaign performance
-agent = create_elastic_marketing_agent()
-result = await agent.execute({
-    "input": "Analyze Q1 campaign performance. Which segments responded best?"
-})
-# Returns: performance metrics, segment analysis, optimization suggestions
-```
-
-### 4. Customer 360 View
-```python
-# Complete customer profile
-agent = create_elastic_sales_agent()
-result = await agent.execute({
-    "input": "Provide complete 360° view for customer Carlos López including all interactions, tickets, and campaign engagement."
-})
-# Returns: comprehensive profile with all related data
-```
+1. Sales - Lead Qualification
+2. Support - Ticket Resolution
+3. Marketing - Campaign Analysis
+4. Customer 360 View
 
 
 ## 🔧 API Reference

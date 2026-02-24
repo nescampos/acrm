@@ -54,21 +54,21 @@ class OpenAIRouter:
         )
 
         system = (
-            "Eres un ruteador de solicitudes para un CRM agéntico. "
-            "Debes elegir exactamente UN agente de la lista para atender el pedido del usuario.\n\n"
-            "Reglas:\n"
-            f"- Valores permitidos para agent_name: {', '.join(allowed)}\n"
-            "- Responde SOLO JSON válido, sin texto adicional.\n"
-            "- Si hay ambigüedad, elige el agente más probable (no hagas preguntas).\n"
+            "You are a request router for an agentic CRM. "
+            "You must choose exactly ONE agent from the list to handle the user's order.\n\n"
+            "Rules:\n"
+            f"- Values allowed for agent_name: {', '.join(allowed)}\n"
+            "- Respond ONLY valid JSON, without additional text.\n"
+            "- If there is ambiguity, choose the most probable agent (do not ask questions).\n"
         )
 
         user = (
-            "AGENTES DISPONIBLES:\n"
+            "AVAILABLE AGENTS:\n"
             f"{agents_block}\n\n"
-            "MENSAJE DEL USUARIO:\n"
+            "USER MESSAGE:\n"
             f"{user_input}\n\n"
-            "Devuelve JSON con esta forma:\n"
-            '{"agent_name":"<uno de los permitidos>","reasoning":"breve"}'
+            "Return JSON with this format:\n"
+            '{"agent_name":"<one of the allowed>","reasoning":"brief"}'
         )
 
         # Preferimos Responses API (openai>=2), con fallback a chat.completions si fuese necesario

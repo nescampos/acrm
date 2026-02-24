@@ -145,14 +145,14 @@ async def index():
     <div class="wrap">
       <div class="card">
         <h1>Elastic CRM Chat</h1>
-        <p class="sub">Router (OpenAI) → Agente Kibana (Agent Builder). Comandos: <span class="pill">/agents</span></p>
+        <p class="sub">Router (OpenAI) → Kibana agent (Agent Builder). Commands: <span class="pill">/agents</span></p>
         <div id="log"></div>
         <div class="row">
-          <textarea id="input" placeholder="Escribe tu solicitud…"></textarea>
-          <button id="send">Enviar</button>
+          <textarea id="input" placeholder="Write your request…"></textarea>
+          <button id="send">Send</button>
         </div>
         <div class="bar">
-          <span class="pill" id="status">Listo</span>
+          <span class="pill" id="status">Ready</span>
           <a href="/docs" target="_blank">API docs</a>
         </div>
       </div>
@@ -203,6 +203,7 @@ async def index():
           const data = await postChat(message);
           if (data.ok) {
             console.log('Debug info:', data.debug);
+            console.log('All data:', data);
             addMsg('bot', `Agente: ${data.agent}`, data.html || data.text, true);
           } else {
             addMsg('bot', 'Error', data.error || 'Error desconocido');
@@ -211,7 +212,7 @@ async def index():
           addMsg('bot', 'Error', String(e));
         } finally {
           send.disabled = false;
-          status.textContent = 'Listo';
+          status.textContent = 'Ready';
         }
       }
 

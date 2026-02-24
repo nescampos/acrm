@@ -50,14 +50,14 @@ class ElasticCRMApplication:
     async def initialize(self) -> None:
         """Inicializa la aplicación, Elastic y registra agentes."""
         setup_logger(level=config.log_level)
-        logger.info("Iniciando Elastic CRM Multi-Agente...")
+        logger.info("Starting Elastic CRM Multi-Agent...")
 
         # Verificar conexión con Elastic
         connected = await elastic_client.ping()
         if not connected:
-            logger.warning("No se pudo conectar a Elasticsearch. Continuando en modo limitado.")
+            logger.warning("Unable to connect to Elasticsearch. Continuing in limited mode.")
         else:
-            logger.info("Conectado a Elasticsearch")
+            logger.info("Connected to Elasticsearch")
 
         # Inicializar repositorios
         self.customer_repo = CustomerRepository()
@@ -76,12 +76,12 @@ class ElasticCRMApplication:
             agents, self._kibana_client = await create_and_register_crm_agents()
             for agent in agents:
                 await self.orchestrator.register_agent(agent)
-                logger.info(f"Agente Kibana registrado: {agent.name}")
+                logger.info(f"Registered Kibana Agent: {agent.name}")
         except RuntimeError as e:
             logger.error(str(e))
             raise
 
-        logger.info("Elastic CRM Multi-Agente inicializado correctamente")
+        logger.info("Elastic CRM Multi-Agent initialized successfully")
 
     async def _initialize_indices(self) -> None:
         """Inicializa índices de Elasticsearch."""
@@ -90,77 +90,77 @@ class ElasticCRMApplication:
             await self.ticket_repo.initialize()
             await self.interaction_repo.initialize()
             await self.campaign_repo.initialize()
-            logger.info("Índices de Elastic inicializados")
+            logger.info("Initialized Elastic indices")
         except Exception as e:
-            logger.warning(f"Error inicializando índices: {e}")
+            logger.warning(f"Error initializing indices: {e}")
 
     async def run_demo(self) -> None:
-        """Ejecuta una demostración de las capacidades del sistema."""
-        logger.info("=== Iniciando Demostración Elastic CRM ===")
+        """Run a demo of the system capabilities."""
+        logger.info("=== Starting demo Elastic CRM ===")
 
-        # Obtener todos los datos de demo
+        # Get demo data
         customers_data, tickets_data, interactions_data, campaigns_data = get_all_demo_data()
 
-        # 1. Agregar clientes a Elasticsearch
-        logger.info("1. Agregando clientes a Elasticsearch...")
+        # 1. Add customers to Elasticsearch
+        logger.info("1. Adding customers to Elasticsearch...")
         for customer in customers_data:
             await self.customer_repo.create(customer)
-            logger.info(f"Cliente agregado a Elastic: {customer.name}")
+            logger.info(f"Customer added to Elastic: {customer.name}")
 
-        # 2. Agregar tickets a Elasticsearch
-        logger.info("\n2. Agregando tickets a Elasticsearch...")
+        # 2. Add tickets to Elasticsearch
+        logger.info("\n2. Adding tickets to Elasticsearch...")
         for ticket in tickets_data:
-            # Asignar customer_id aleatorio de los clientes creados
+            # Assign random customer_id from created customers
             import random
             ticket.customer_id = random.choice([c.customer_id for c in customers_data])
             await self.ticket_repo.create(ticket)
-            logger.info(f"Ticket agregado a Elastic: {ticket.subject}")
+            logger.info(f"Ticket added to Elastic: {ticket.subject}")
 
-        # 3. Agregar interacciones a Elasticsearch
-        logger.info("\n3. Agregando interacciones a Elasticsearch...")
+        # 3. Add interactions to Elasticsearch
+        logger.info("\n3. Adding interactions to Elasticsearch...")
         for interaction in interactions_data:
-            # Asignar customer_id aleatorio
+            # Assign random customer_id
             import random
             interaction.customer_id = random.choice([c.customer_id for c in customers_data])
             await self.interaction_repo.create(interaction)
-            logger.info(f"Interacción agregada a Elastic: {interaction.interaction_type}")
+            logger.info(f"Interaction added to Elastic: {interaction.interaction_type}")
 
-        # 4. Agregar campañas a Elasticsearch
-        logger.info("\n4. Agregando campañas a Elasticsearch...")
+        # 4. Add campaigns to Elasticsearch
+        logger.info("\n4. Adding campaigns to Elasticsearch...")
         for campaign in campaigns_data:
             await self.campaign_repo.create(campaign)
-            logger.info(f"Campaña agregada a Elastic: {campaign.name}")
+            logger.info(f"Campaign added to Elastic: {campaign.name}")
 
-        # Esperar a que Elastic indexe
+        # Wait for Elasticsearch to index
         await asyncio.sleep(1)
 
-        # 5. Búsqueda en Elasticsearch
-        logger.info("\n5. Búsqueda en Elasticsearch...")
+        # 5. Search in Elasticsearch
+        logger.info("\n5. Search in Elasticsearch...")
         results = await self.customer_repo.search({"match_all": {}})
-        logger.info(f"Clientes en Elastic: {len(results)}")
+        logger.info(f"Customers in Elastic: {len(results)}")
 
-        # Búsqueda específica
+        # Specific search
         juan_results = await self.customer_repo.find_by_email("juan.perez@techcorp.com")
         if juan_results:
-            logger.info(f"Encontrado: {juan_results.name} (Lead Score: {juan_results.lead_score})")
+            logger.info(f"Found: {juan_results.name} (Lead Score: {juan_results.lead_score})")
 
 
-        # 6. Mostrar estado del sistema
-        logger.info("\n6. Estado del sistema:")
+        # 6. System status
+        logger.info("\n6. System status:")
         status = self.orchestrator.get_status()
-        logger.info(f"Agentes Kibana registrados: {status['agents_count']}")
+        logger.info(f"Kibana agents registered: {status['agents_count']}")
         
         customer_count = await self.customer_repo.count()
         ticket_count = await self.ticket_repo.count()
         interaction_count = await self.interaction_repo.count()
         campaign_count = await self.campaign_repo.count()
         
-        logger.info(f"Clientes en Elastic: {customer_count}")
-        logger.info(f"Tickets en Elastic: {ticket_count}")
-        logger.info(f"Interacciones en Elastic: {interaction_count}")
-        logger.info(f"Campañas en Elastic: {campaign_count}")
+        logger.info(f"Customers in Elastic: {customer_count}")
+        logger.info(f"Tickets in Elastic: {ticket_count}")
+        logger.info(f"Interactions in Elastic: {interaction_count}")
+        logger.info(f"Campaigns in Elastic: {campaign_count}")
 
-        logger.info("\n=== Demostración Elastic CRM Completada ===")
+        logger.info("\n=== Elastic CRM Demo Completed ===")
 
     async def run(self, run_demo: bool = False) -> None:
         """Ejecuta la aplicación."""
@@ -179,7 +179,7 @@ class ElasticCRMApplication:
         await self.initialize()
         assert self.orchestrator is not None
 
-        logger.info("Modo chat iniciado. Comandos: /agents, /exit")
+        logger.info("Chat mode started. Commands: /agents, /exit")
         conversation_ids: dict[str, str] = {}
 
         while True:
@@ -217,7 +217,7 @@ class ElasticCRMApplication:
                 if result.success:
                     payload = result.data
                     
-                    # Extraer el mensaje de la respuesta de Kibana
+                    # Extract the message from the response of the Kibana agent
                     output = self._extract_message_from_response(payload)
                     
                     print(f"[{agent_name}] {output}")
@@ -228,23 +228,23 @@ class ElasticCRMApplication:
 
     async def shutdown(self) -> None:
         """Aplica el shutdown graceful."""
-        logger.info("Cerrando aplicación...")
+        logger.info("Closing application...")
         if self.orchestrator:
             await self.orchestrator.shutdown()
         if self._kibana_client:
             await self._kibana_client.close()
         await elastic_client.close()
-        logger.info("Aplicación cerrada")
+        logger.info("Application closed")
         self._shutdown_event.set()
 
     def _extract_message_from_response(self, payload: dict) -> str:
         """
-        Extrae el mensaje de la respuesta del agente de Kibana.
+        Extract the message from the response of the Kibana agent.
         
-        La respuesta de Kibana tiene el formato:
+        The response from Kibana has the format:
         {
             "response": {
-                "message": "contenido del mensaje"
+                "message": "content of the message"
             },
             ...
         }
@@ -275,12 +275,12 @@ async def main():
     group.add_argument(
         "--demo",
         action="store_true",
-        help="Ejecutar la demo que inserta datos en Elasticsearch",
+        help="Run the demo that inserts data into Elasticsearch",
     )
     group.add_argument(
         "--chat",
         action="store_true",
-        help="Iniciar modo chat en consola (ruteo + agentes Kibana)",
+        help="Run the chat mode in console (routing + Kibana agents)",
     )
     args = parser.parse_args()
     app = ElasticCRMApplication()
@@ -290,7 +290,7 @@ async def main():
         else:
             await app.run(run_demo=args.demo)
     except KeyboardInterrupt:
-        logger.info("Interrupción recibida")
+        logger.info("Keyboard interrupt received")
     finally:
         await app.shutdown()
 
