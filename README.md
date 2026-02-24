@@ -1,4 +1,4 @@
-# Elastic CRM - Multi-Agent System with Elastic Agent Builder
+# aCRM - Agentic CRM System with Elastic Agent Builder
 
 A sophisticated multi-agent CRM system integrated with **Elasticsearch** and **Elastic Agent Builder**. Manages customers, sales, support, and marketing through specialized agents leveraging semantic search and RAG capabilities on CRM data stored in Elasticsearch.
 
@@ -7,26 +7,26 @@ This platform use **OpenAI SDK** for routing between agents, verifying the user'
 ## 🏗️ Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    CRM Orchestrator                             │
-│  ┌─────────────┬─────────────┬─────────────┬─────────────────┐ │
-│  │  Agent      │  Task       │  Customer   │  Global         │ │
-│  │  Registry   │  Queue      │  (Elastic)  │  State          │ │
-│  └─────────────┴─────────────┴─────────────┴─────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                    CRM Orchestrator                                  │
+│  ┌─────────────┬─────────────┬─────────────┬───────────────────────┐ │
+│  │  Agent      │  Task       │  Customer   │  Global               │ │
+│  │  Registry   │  Queue      │  (Elastic)  │  State (to implement) │ │
+│  └─────────────┴─────────────┴─────────────┴───────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────┘
          │              │              │
          ▼              ▼              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              Elastic Agent Builder                              │
+┌────────────────────────────────────────────────────────────────┐
+│              Elastic Agent Builder                             │
 │  ┌─────────────┬─────────────┬─────────────┬─────────────────┐ │
 │  │  Semantic   │  RAG        │  Context    │  Tools          │ │
 │  │  Search     │  Retrieval  │  Building   │  Integration    │ │
 │  └─────────────┴─────────────┴─────────────┴─────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+└────────────────────────────────────────────────────────────────┘
          │
          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Elasticsearch Cluster                        │
+┌────────────────────────────────────────────────────────────────┐
+│                    Elasticsearch Cluster                       │
 │  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐            │
 │  │ crm_customers│ │ crm_tickets  │ │ crm_         │            │
 │  │              │ │              │ │ interactions │            │
@@ -34,7 +34,7 @@ This platform use **OpenAI SDK** for routing between agents, verifying the user'
 │  ┌──────────────┐                                              │
 │  │ crm_campaigns│                                              │
 │  └──────────────┘                                              │
-└─────────────────────────────────────────────────────────────────┘
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ### Core Components
@@ -43,7 +43,7 @@ This platform use **OpenAI SDK** for routing between agents, verifying the user'
 - **Agent Registry**: Manages registration and discovery of all agents
 - **Task Queue**: Routes requests to appropriate agents based on OpenAI routing
 - **Customer Management**: Centralized customer data access via Elasticsearch
-- **Global State**: Maintains conversation context and agent states
+- **Global State** (to implement): Maintains conversation context and agent states
 
 #### 2. **Elastic Agent Builder**
 - **Semantic Search**: Full-text search with fuzzy matching across all CRM indices
@@ -59,7 +59,7 @@ This platform use **OpenAI SDK** for routing between agents, verifying the user'
 ## 📁 Project Structure
 
 ```
-Elastic/
+root/
 ├── agents/                 # Base and specialized agents
 │   ├── base.py            # Abstract base agent class
 │   ├── sales.py           # Sales agent (standard)

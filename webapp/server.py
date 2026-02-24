@@ -9,7 +9,7 @@ from typing import Any, Optional
 from fastapi import Cookie, FastAPI, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from loguru import logger
-from markdownify import markdownify as md
+from markdown import markdown as md
 
 from main import ElasticCRMApplication
 
@@ -58,33 +58,7 @@ def _markdown_to_html(text: str) -> str:
     if not text:
         return ""
     
-    # Preprocesar el texto para asegurar formato correcto
-    # Convertir dobles saltos de línea a <br> para preservar párrafos
-    text = text.replace('\n\n', '<br><br>')
-    
-    # Convertir markdown a HTML
-    html = md(text, 
-              heading_style="ATX",
-              bullets="*",
-              strong_em_symbol="*",
-              em_symbol="*",
-              convert=['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
-                      'strong', 'em', 'u', 's', 'code', 'pre',
-                      'ul', 'ol', 'li', 'blockquote', 'table', 'thead', 
-                      'tbody', 'tr', 'th', 'td', 'hr', 'br'])
-    
-    # Limpiar y mejorar el HTML con estilos
-    html = html.replace("<table>", '<table style="border-collapse: collapse; width: 100%; margin: 8px 0;">')
-    html = html.replace("<th>", '<th style="border: 1px solid #223255; padding: 8px; text-align: left; background: #1b2a4d;">')
-    html = html.replace("<td>", '<td style="border: 1px solid #223255; padding: 8px;">')
-    html = html.replace("<ul>", '<ul style="margin: 8px 0; padding-left: 20px;">')
-    html = html.replace("<ol>", '<ol style="margin: 8px 0; padding-left: 20px;">')
-    html = html.replace("<li>", '<li style="margin: 4px 0;">')
-    html = html.replace("<blockquote>", '<blockquote style="border-left: 3px solid #2a3c64; padding-left: 12px; margin: 8px 0; color: #9fb2d0;">')
-    html = html.replace("<code>", '<code style="background: #1b2a4d; padding: 2px 6px; border-radius: 4px; font-family: monospace;">')
-    html = html.replace("<pre>", '<pre style="background: #1b2a4d; padding: 12px; border-radius: 8px; overflow-x: auto; margin: 8px 0;">')
-    html = html.replace("<hr>", '<hr style="border: 1px solid #223255; margin: 16px 0;">')
-    html = html.replace("<p>", '<p style="margin: 8px 0;">')
+    html = md(text)
     
     return html
 
@@ -106,7 +80,7 @@ async def lifespan(app: FastAPI):
         logger.info("Webapp shutdown complete")
 
 
-app = FastAPI(title="Elastic CRM Web", lifespan=lifespan)
+app = FastAPI(title="Agentic CRM Web", lifespan=lifespan)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -119,7 +93,7 @@ async def index():
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Elastic CRM Chat</title>
+    <title>aCRM Chat - Agentic CRM</title>
     <style>
       :root { color-scheme: light; }
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background: #0b1220; color: #e6edf7; }
@@ -144,7 +118,7 @@ async def index():
   <body>
     <div class="wrap">
       <div class="card">
-        <h1>Elastic CRM Chat</h1>
+        <h1>aCRM Chat - Agentic CRM</h1>
         <p class="sub">Router (OpenAI) → Kibana agent (Agent Builder). Commands: <span class="pill">/agents</span></p>
         <div id="log"></div>
         <div class="row">
@@ -202,8 +176,6 @@ async def index():
           }
           const data = await postChat(message);
           if (data.ok) {
-            console.log('Debug info:', data.debug);
-            console.log('All data:', data);
             addMsg('bot', `Agente: ${data.agent}`, data.html || data.text, true);
           } else {
             addMsg('bot', 'Error', data.error || 'Error desconocido');

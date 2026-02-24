@@ -17,6 +17,7 @@ openai==2.21.0
 fastapi
 uvicorn[standard]
 markdownify>=0.13.1
+markdown>=3.10
 
 # Elastic Stack
 elasticsearch>=8.0.0
